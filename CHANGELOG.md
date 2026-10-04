@@ -6,6 +6,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Issue categories: a default list of 11, replaceable in `qa-tracker.config.json`.
+
 ## [0.2.0] - 2026-10-04
 
 Tightens the evidence rules. Trackers whose YAML was hand-edited against them
