@@ -5,12 +5,10 @@ import { LEVELS, DIMS, ISSUE_STATUS } from './schema.mjs';
 import { nextRunPlan } from './plan.mjs';
 import { flattenSurfaces, surfaceStats } from './surfaces.mjs';
 import { DEFAULT_TITLE } from './config.mjs';
-import { DIM_ICON, SEV_ORDER } from './format.mjs';
+import { DIM_ICON, SEV_ORDER, STATUS_ORDER } from './format.mjs';
 
 const idx = l => LEVELS.indexOf(l);
 export const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-const STATUS_ORDER = { fixed: 0, 'verified-fixed': 1, 'wont-fix': 2 };
 
 export const STYLE = `
   :root { color-scheme: light dark; --bg:#fff; --fg:#111; --muted:#667; --line:#e3e5ea; --pass:#16a34a; --todo:#c3c9d4; --tgt:#2563eb; --ok:#16a34a; --bad:#dc2626; --warn:#d97706; }

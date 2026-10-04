@@ -6,7 +6,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { parse, parseDocument, isSeq, isMap } from 'yaml';
-import { validate, validateAll } from './validate.mjs';
+import { validate, validateAll, isLogWarning } from './validate.mjs';
 import { applyChange } from './edit.mjs';
 import { renderMarkdown } from './markdown.mjs';
 import { loadSurfaceFiles, renderSurfaces, surfaceFile } from './surfaces.mjs';
@@ -48,8 +48,14 @@ export function createStore(cfg) {
   const checkOpts = { exists, categories: cfg.categories };
   const errorsOf = d => validate(d, checkOpts);
 
+  /** The STATUS.md text for `d`: one input for the file and for `status`, so they never differ. */
+  function renderStatus(d = data()) {
+    const warnings = validateAll(d, checkOpts).warnings.filter(w => !isLogWarning(w));
+    return renderMarkdown(d, { title: cfg.title, categories: cfg.categories, warnings });
+  }
+
   function writeStatus(d = data()) {
-    writeAtomic(files.status, renderMarkdown(d, { title: cfg.title }));
+    writeAtomic(files.status, renderStatus(d));
     if (d.surfaces.length)
       writeAtomic(files.surfaces, renderSurfaces(d.surfaces, { features: d.features, title: `${cfg.title} — UI surfaces` }));
     else rmSync(files.surfaces, { force: true }); // generated; stale once the last surfaces file is gone
@@ -119,7 +125,7 @@ export function createStore(cfg) {
     return { ok: false, error: `unknown surface: ${id}` };
   }
 
-  return { config: cfg, data, readDocs, validate: () => errorsOf(data()), check: () => validateAll(data(), checkOpts), writeStatus, commit, setVerdict };
+  return { config: cfg, data, readDocs, validate: () => errorsOf(data()), check: () => validateAll(data(), checkOpts), renderStatus, writeStatus, commit, setVerdict };
 }
 
 function findSurface(seq, id) {

@@ -36,8 +36,15 @@ All notable changes to this project are documented here. The format follows
   `add-issue` sends the new issue to Jev and applies the confident answers;
   `--no-assess` skips it. A missing key or a failed request prints a warning and
   the issue is still saved.
+- `STATUS.md` issue tables gain Category and Cx (complexity) columns, with `ᴶ`
+  marking values Jev set that nobody has confirmed, a Severity / Complexity /
+  Status legend, and a "Triage queue" section (with the issue warnings under it).
+  Open issues sort by severity, then complexity, unset last. `status` prints the
+  same text as `STATUS.md`.
 
 ### Changed
+- The `Type` column is gone from the `STATUS.md` issue tables; the category
+  implies it.
 - `severity` is no longer required on an issue; when present it must still be
   one of `critical`, `high`, `medium` or `low`.
 - `validate` prints warnings (`warning: …`, exit 0) alongside its errors.

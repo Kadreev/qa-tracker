@@ -455,3 +455,26 @@ test('help lists the triage commands and flags', async () => {
   const help = (await run(REPO, '--help')).out;
   for (const s of ['triage [--json]', 'category|complexity|severity|details', '--assess', '--no-assess', '--details']) assert.ok(help.includes(s), s);
 });
+
+test('status prints exactly STATUS.md, with issue warnings but not log warnings under the queue', async () => {
+  const cwd = await triageProject({
+    issues: `- id: QA-1
+  title: Menu
+  severity: low
+  category: accessibility
+  complexity: 2
+  type: usability
+  feature: a
+  status: open
+  triage:
+    category: { source: jev, assessment: asm-2099-01-01 }
+`,
+    config: { categories: { visual: { type: 'usability', description: 'Looks wrong' } } },
+  });
+  assert.equal((await run(cwd, 'render')).code, 0);
+  const file = read(cwd, 'STATUS.md');
+  assert.equal((await run(cwd, 'status')).out, file);
+  assert.match(file, /\*\*Warnings\*\*\n- issue QA-1: category accessibility is not in the category list\n/);
+  assert.doesNotMatch(file, /asm-2099-01-01 does not exist/); // log warnings stay out
+  assert.match(file, /\| QA-1 \| low \| accessibilityᴶ \| 2 \|/);
+});

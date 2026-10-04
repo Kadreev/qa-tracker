@@ -8,6 +8,7 @@ _Last run: run-2026-01-20 (2026-01-20, sandbox) · 6 features · 3 open issues �
 - **W** — weight (priority/risk, 1–5). Higher ⇒ must be validated deeper.
 - **Cur / Tgt** — validation level reached / target. Ladder (cumulative, highest passed): **L0** Renders · **L1** Read validated · **L2** Interactions · **L3** CRUD · **L4** Hardened.
 - **Func / UX / Code** — functionality / usability / code-health: ✅ pass · ⚠️ has issues · ❔ unknown.
+- **Severity** = impact on users (critical → low) · **Complexity** = effort to fix, 1–10 · **Status** = lifecycle (open → fixed → verified-fixed, or wont-fix) · ᴶ = set by Jev, not yet confirmed.
 
 ## Coverage matrix
 | Feature | Area | W | Cur | Tgt | Func | UX | Code | Issues |
@@ -20,17 +21,27 @@ _Last run: run-2026-01-20 (2026-01-20, sandbox) · 6 features · 3 open issues �
 | Account settings | Settings | 2 | L2 | L2 | ✅ | ✅ | ✅ | — |
 
 ## Open issues (by severity)
-| ID | Severity | Type | Feature | Title | Status |
-|---|---|---|---|---|---|
-| QA-4 | critical | functionality | note-editor | Autosave drops the last 2 seconds of typing when the tab is closed | open |
-| QA-5 | medium | usability | search | No-results state says "Error" instead of explaining there were no matches | open |
-| QA-3 | low | usability | notes-list | Sort menu has no keyboard focus ring | open |
+| ID | Severity | Category | Cx | Feature | Title | Status |
+|---|---|---|---|---|---|---|
+| QA-4 | critical | — | — | note-editor | Autosave drops the last 2 seconds of typing when the tab is closed | open |
+| QA-5 | medium | — | — | search | No-results state says "Error" instead of explaining there were no matches | open |
+| QA-3 | low | — | — | notes-list | Sort menu has no keyboard focus ring | open |
 
 ## Closed issues
-| ID | Severity | Type | Feature | Title | Status |
-|---|---|---|---|---|---|
-| QA-2 | high | functionality | notes-list | Deleting a pinned note leaves an empty card until reload | fixed |
-| QA-1 | medium | functionality | sign-in | Sign-up form accepts an e-mail with a trailing space and then cannot sign in | verified-fixed |
+| ID | Severity | Category | Cx | Feature | Title | Status |
+|---|---|---|---|---|---|---|
+| QA-2 | high | — | — | notes-list | Deleting a pinned note leaves an empty card until reload | fixed |
+| QA-1 | medium | — | — | sign-in | Sign-up form accepts an e-mail with a trailing space and then cannot sign in | verified-fixed |
+
+## Triage queue
+| Issue | Field | Kind | Current | Suggested | Confidence | Reason |
+|---|---|---|---|---|---|---|
+| QA-3 | category | needs-triage | — | — | — | not assessed |
+| QA-3 | complexity | needs-triage | — | — | — | not assessed |
+| QA-4 | category | needs-triage | — | — | — | not assessed |
+| QA-4 | complexity | needs-triage | — | — | — | not assessed |
+| QA-5 | category | needs-triage | — | — | — | not assessed |
+| QA-5 | complexity | needs-triage | — | — | — | not assessed |
 
 ## UI surfaces (see `SURFACES.md` for the nested checklist)
 _7 surfaces · ✅ 3 · ❌ 1 · ⛔ 1 · ⬜ 2 never checked._

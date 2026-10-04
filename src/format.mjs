@@ -7,6 +7,9 @@ export const DIM_ICON = { pass: '✅', issues: '⚠️', unknown: '❔' };
 /** Sort rank for issue severity, most severe first. */
 export const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 
+/** Sort rank for a closed issue's status. */
+export const STATUS_ORDER = { fixed: 0, 'verified-fixed': 1, 'wont-fix': 2 };
+
 /** Make a value safe inside a Markdown table cell: escape pipes, fold newlines. */
 export const cell = s => String(s ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
 

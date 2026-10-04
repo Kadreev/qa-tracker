@@ -8,7 +8,6 @@ import { createStore } from './store.mjs';
 import { createServer } from './server.mjs';
 import { initTracker } from './init.mjs';
 import { nextRunPlan } from './plan.mjs';
-import { renderMarkdown } from './markdown.mjs';
 import { flattenSurfaces, renderSurfaces } from './surfaces.mjs';
 import { DIMS, LEVELS } from './schema.mjs';
 import { selectIssues, assessAndCommit, assessJson, formatAssessReport, formatAssessLine, dryRunRequests, emptyAssessResult } from './assess.mjs';
@@ -172,7 +171,7 @@ export async function main(argv, io = {}) {
   try {
     switch (cmd) {
       case 'status':
-        out(renderMarkdown(store.data(), { title: cfg.title }));
+        out(store.renderStatus());
         return 0;
       case 'render':
         store.writeStatus();
