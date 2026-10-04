@@ -9,3 +9,6 @@ export const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 
 /** Make a value safe inside a Markdown table cell: escape pipes, fold newlines. */
 export const cell = s => String(s ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+
+/** A 0-1 fraction as a whole percentage: 0.91 → '91%'. */
+export const pct = x => Math.round(x * 100) + '%';
