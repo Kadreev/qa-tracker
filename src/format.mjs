@@ -13,6 +13,9 @@ export const STATUS_ORDER = { fixed: 0, 'verified-fixed': 1, 'wont-fix': 2 };
 /** Make a value safe inside a Markdown table cell: escape pipes, fold newlines. */
 export const cell = s => String(s ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
 
+/** Make a value safe inside HTML text or a double-quoted attribute. */
+export const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 /** A 0-1 fraction as a whole percentage: 0.91 → '91%'. */
 export const pct = x => Math.round(x * 100) + '%';
 

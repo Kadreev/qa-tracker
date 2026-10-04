@@ -130,7 +130,8 @@ Every finding carries three **triage fields**. They answer different questions:
 `fixed` → `verified-fixed`, or `wont-fix`). `type` (`code`, `functionality`,
 `usability`) follows from the category. The category and complexity tables are in
 [docs/SCHEMA.md](docs/SCHEMA.md); `STATUS.md` and the dashboard show Severity,
-Category and Cx (complexity) side by side, with a legend.
+Category and Cx (complexity) side by side, with a legend (on the dashboard, a
+tooltip on each column header).
 
 TypeSafe's Jev can judge the three fields for you. Code, not a person, decides
 what happens to each answer. It is optional: without a key nothing is sent

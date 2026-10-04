@@ -2,6 +2,14 @@
 
 _Last run: run-2026-01-20 (2026-01-20, sandbox) · 6 features · 3 open issues · 2 closed issues._
 
+## Summary
+- **Open issues:** 3 — critical 1 · high 0 · medium 1 · low 1 · unrated 0
+- **Fixed:** 2 of 5 (40%) — 1 verified · 1 awaiting check
+- **Coverage:** 1 of 6 features at target · weighted 49%
+- **Hotspot:** Note editor (`note-editor`) — QA-4 (critical), score 8
+- **Quick wins:** 2 open issues with complexity ≤ 3
+- **Triage queue:** 2 items
+
 > Generated from the YAML files next to this one — do not edit by hand; run `qa-tracker render`.
 
 ## Legend

@@ -6,10 +6,39 @@ import { DEFAULT_TITLE } from './config.mjs';
 import { DIM_ICON, cell, pct, openOrder, closedOrder } from './format.mjs';
 import { resolveCategories } from './categories.mjs';
 import { triageQueue } from './triage-policy.mjs';
+import { summarize, SEVERITY_KEYS, QUICK_WIN_MAX } from './summary.mjs';
 
 /** A field's value, or — when unset; suffixed ᴶ while its triage source is Jev. */
 const triaged = (issue, field) =>
   (issue[field] == null ? '—' : `${cell(issue[field])}${issue.triage?.[field]?.source === 'jev' ? 'ᴶ' : ''}`);
+
+const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/** The `## Summary` bullets: issues, fixed, coverage, hotspot, quick wins, triage queue. */
+function summaryBlock(s) {
+  const { issues, coverage, hotspot } = s;
+  const open = issues.total
+    ? `${issues.open} — ${SEVERITY_KEYS.map(k => `${k} ${issues.openBySeverity[k]}`).join(' · ')}`
+    : 'No issues yet';
+  const fixable = issues.total - issues.wontFix;
+  const fixed = !issues.total ? 'No issues yet'
+    : issues.fixedPct === null ? 'Nothing to fix (every issue is wont-fix)'
+      : `${issues.fixed + issues.verified} of ${fixable} (${issues.fixedPct}%) — ${issues.verified} verified · ${issues.fixed} awaiting check`;
+  const cover = coverage.features
+    ? `${coverage.atTarget} of ${plural(coverage.features, 'feature')} at target · weighted ${coverage.weightedPct}%`
+    : 'No features yet';
+  const hot = hotspot
+    ? `${cell(hotspot.name)} (\`${hotspot.feature}\`) — ${cell(hotspot.worst.id)} (${hotspot.worst.severity}), score ${hotspot.score}`
+    : 'none';
+  return `## Summary
+- **Open issues:** ${open}
+- **Fixed:** ${fixed}
+- **Coverage:** ${cover}
+- **Hotspot:** ${hot}
+- **Quick wins:** ${plural(s.quickWins, 'open issue')} with complexity ≤ ${QUICK_WIN_MAX}
+- **Triage queue:** ${plural(s.triage, 'item')}
+`;
+}
 
 /**
  * renderMarkdown(data, { title, categories, warnings }) → the STATUS.md text.
@@ -64,6 +93,7 @@ ${surfaceRows}
 
 _Last run: ${cell(lastRun?.id ?? 'none')}${lastRun ? ` (${cell(lastRun.date)}, ${cell(lastRun.blast_radius)})` : ''} · ${features.length} features · ${open.length} open issues · ${closed.length} closed issues._
 
+${summaryBlock(summarize(data, { categories }))}
 > Generated from the YAML files next to this one — do not edit by hand; run \`qa-tracker render\`.
 
 ## Legend

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { renderMarkdown } from '../src/markdown.mjs';
-import { renderContent } from '../src/dashboard.mjs';
+import { renderContent, STYLE } from '../src/dashboard.mjs';
 import { nextRunPlan } from '../src/plan.mjs';
 
 const data = {
@@ -157,7 +157,9 @@ test('dashboard issues sort like STATUS.md; unset severity does not break orderi
 });
 
 test('dashboard issue cells: Cx column, sev none, em dash for unset', () => {
-  assert.ok(dash.includes('<th>ID</th><th>Severity</th><th>Category</th><th>Cx</th><th>Feature</th><th>Title</th><th>Status</th>'));
+  const head = dash.split('<h2>Open issues</h2>')[1].split('</thead>')[0];
+  const labels = [...head.matchAll(/<th>(?:<span class="tip"[^>]*>)?([^<]+)/g)].map(m => m[1]);
+  assert.deepEqual(labels, ['ID', 'Severity', 'Category', 'Cx', 'Feature', 'Title', 'Status']);
   assert.ok(!dash.includes('<th>Type</th>'));
   assert.ok(rowOf('QA-2').includes('class="sev none"><span class="iv">—</span>'));
   assert.ok(rowOf('QA-2').includes('<td><span class="iv">—</span><select class="edit-only" data-act="icategory"'));
@@ -200,4 +202,72 @@ test('dashboard has the legend line and a triage queue between closed issues and
   assert.ok(dash.includes('<th>Issue</th><th>Field</th><th>Kind</th><th>Current</th><th>Suggested</th><th>Confidence</th><th>Reason</th>'));
   const empty = renderContent({ ...structuredClone(data), issues: [issue('QA-9', { severity: 'low', category: 'accessibility', complexity: 2 })] }, { categories: dashCats });
   assert.ok(empty.includes('Triage queue empty.'));
+});
+
+// --- summary block, cards and header tooltips ---
+test('STATUS.md has a Summary block after the last-run line', () => {
+  const md = renderMarkdown(data);
+  assert.match(md, /^_Last run: [^\n]*\n\n## Summary\n- \*\*Open issues:\*\* 1 — critical 0 · high 1 · medium 0 · low 0 · unrated 0\n/m);
+  assert.ok(md.includes('- **Fixed:** 1 of 2 (50%) — 1 verified · 0 awaiting check\n'), md);
+  assert.ok(md.includes('- **Coverage:** 1 of 2 features at target · weighted 29%\n'), md);
+  assert.ok(md.includes('- **Hotspot:** Notes list (`notes-list`) — QA-1 (high), score 4\n'), md);
+  assert.ok(md.includes('- **Quick wins:** 0 open issues with complexity ≤ 3\n'), md);
+  assert.ok(md.includes('- **Triage queue:** 2 items\n'), md);
+  assert.ok(md.indexOf('## Summary') < md.indexOf('## Legend'));
+  const empty = renderMarkdown({});
+  assert.ok(empty.includes('- **Open issues:** No issues yet\n'), empty);
+  assert.ok(empty.includes('- **Fixed:** No issues yet\n'));
+  assert.ok(empty.includes('- **Coverage:** No features yet\n'));
+  assert.ok(empty.includes('- **Hotspot:** none\n'));
+});
+
+test('dashboard summary cards and panels sit above the coverage matrix', () => {
+  const html = renderContent(data, { categories: dashCats });
+  const at = s => html.indexOf(s);
+  assert.ok(at('class="cards"') > at('class="meta"') && at('class="cards"') < at('<h2>Coverage matrix</h2>'));
+  assert.ok(at('class="panels"') > at('class="cards"') && at('class="panels"') < at('<h2>Coverage matrix</h2>'));
+  for (const label of ['Open issues', 'Fixed', 'Coverage', 'Hotspot', 'Issues by feature', 'Severity × status', 'Work queue']) {
+    assert.ok(html.slice(0, at('<h2>Coverage matrix</h2>')).includes(label), label);
+  }
+  assert.ok(html.includes('style="width:100%"'), 'bars are divs with percentage widths');
+  assert.ok(!html.includes('card-crit'), 'no critical emphasis without a critical issue');
+  const crit = structuredClone(data);
+  crit.issues[0].severity = 'critical';
+  assert.ok(renderContent(crit, { categories: dashCats }).includes('card-crit'));
+  const empty = renderContent({}, { categories: dashCats });
+  assert.ok(empty.includes('No issues yet'));
+  assert.ok(empty.includes('No features yet'));
+});
+
+test('a hostile feature name or issue title renders escaped in the summary', () => {
+  const d = structuredClone(data);
+  d.features[0].name = '<script>alert(1)</script>';
+  d.issues[0].title = '<script>alert(2)</script>';
+  const html = renderContent(d, { categories: dashCats });
+  const summary = html.slice(0, html.indexOf('<h2>Coverage matrix</h2>'));
+  assert.ok(summary.includes('&lt;script&gt;alert(1)&lt;/script&gt;'), 'feature name in hotspot and by-feature panel');
+  assert.ok(summary.includes('&lt;script&gt;alert(2)&lt;/script&gt;'), 'worst issue title in the hotspot card');
+  assert.ok(!html.includes('<script>'));
+});
+
+test('explained headers carry tooltips; legends print after each table', () => {
+  assert.ok(dash.includes('<th><span class="tip" tabindex="0" aria-describedby="tip-W">W</span><span class="tiptext" role="tooltip" id="tip-W">'));
+  for (const key of ['L0', 'L1', 'L2', 'L3', 'L4', 'dims', 'sev-open', 'cat-open', 'cx-open', 'status-open', 'sev-closed', 'cat-closed', 'cx-closed', 'status-closed']) {
+    assert.ok(dash.includes(`aria-describedby="tip-${key}"`), key);
+    assert.ok(dash.includes(`role="tooltip" id="tip-${key}"`), key);
+  }
+  const ids = [...dash.matchAll(/ id="(tip-[^"]+)"/g)].map(m => m[1]);
+  assert.equal(new Set(ids).size, ids.length);
+  assert.ok(!/class="legend"/.test(dash));
+  for (const h of ['Coverage matrix', 'Open issues', 'Closed issues']) {
+    const section = dash.split(`<h2>${h}</h2>`)[1].split('<h2>')[0];
+    assert.match(section, /<\/table><\/div>\s*<div class="legend-print">[\s\S]*<\/div>\s*$/, h);
+  }
+  assert.ok(STYLE.includes('.legend-print { display: none'));
+  assert.match(STYLE, /@media print \{[\s\S]*\.legend-print \{ display: grid/);
+});
+
+test('issue IDs do not wrap', () => {
+  assert.ok(rowOf('QA-1').startsWith('><td class="id">QA-1</td>'), rowOf('QA-1'));
+  assert.match(STYLE, /td\.id \{[^}]*white-space: nowrap/);
 });

@@ -7,6 +7,7 @@ export { resolveCategories, DEFAULT_CATEGORIES } from './categories.mjs';
 export { assessmentIndex, judgmentOf, latestFor } from './assessments.mjs';
 export { applyChange, CHANGE_KINDS, nextId, nextRunId, nextAssessmentId } from './edit.mjs';
 export { nextRunPlan } from './plan.mjs';
+export { summarize, SEVERITY_WEIGHT } from './summary.mjs';
 export { renderMarkdown } from './markdown.mjs';
 export { renderContent } from './dashboard.mjs';
 export { createServer, BROWSER_KINDS } from './server.mjs';

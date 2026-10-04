@@ -44,6 +44,12 @@ All notable changes to this project are documented here. The format follows
 - The dashboard shows the Category and Cx columns (Jev-set values carry the ᴶ mark and a
   "Jev 91%" tooltip), a "Triage queue" section, and edit-mode selects for category,
   complexity and severity that record explicit values like `set`.
+- Dashboard summary: four cards above the coverage matrix (open issues with a
+  severity bar, fixed with verified / awaiting check, coverage at target and
+  weighted, and the hotspot feature with its worst open issue) and three panels
+  (issues by feature, severity × status, work queue with the triage queue size
+  and quick wins). `summarize(data, { categories })` returns the same numbers.
+- `STATUS.md` opens with a `## Summary` block of the same numbers.
 - Docs: a "Triage with Jev" section in the README (fields, the autonomous flow,
   the triage queue, exactly what is sent to TypeSafe, key setup, opt-in
   auto-assess), the agent guide and skill without `--severity` as required, the
@@ -52,6 +58,9 @@ All notable changes to this project are documented here. The format follows
   `TYPESAFE_API_KEY`, writes nothing, not part of CI).
 
 ### Changed
+- The dashboard legends are now tooltips on the column headers (hover or keyboard
+  focus); a print-only legend follows each table so PDF exports keep them. Issue
+  IDs no longer wrap.
 - The `Type` column is gone from the `STATUS.md` issue tables; the category
   implies it.
 - `severity` is no longer required on an issue; when present it must still be

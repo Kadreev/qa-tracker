@@ -106,7 +106,22 @@ test('the page shows triage columns and the queue', async () => {
   assert.match(body, /data-act="icategory"/);
   assert.match(body, /data-act="iseverity"/);
   assert.match(body, /Triage queue/);
-  assert.match(body, /<th>Category<\/th><th>Cx<\/th>/);
+  assert.match(body, />Category<\/span><span class="tiptext" role="tooltip" id="tip-cat-open">/);
+  assert.match(body, />Cx<\/span><span class="tiptext" role="tooltip" id="tip-cx-open">/);
+});
+
+test('the page has summary cards and header tooltips', async () => {
+  const { body } = await request('GET', '/');
+  assert.match(body, /class="cards"/);
+  assert.match(body, /Hotspot/);
+  assert.match(body, /role="tooltip"/);
+  assert.match(body, /aria-describedby="tip-W"/);
+  const legendClasses = [...body.matchAll(/class="([^"]*)"/g)].map(m => m[1].split(/\s+/)).flat().filter(c => /legend/.test(c));
+  assert.ok(legendClasses.length > 0);
+  assert.deepEqual([...new Set(legendClasses)], ['legend-print']);
+  const ids = [...body.matchAll(/ id="(tip-[^"]+)"/g)].map(m => m[1]);
+  assert.equal(new Set(ids).size, ids.length, 'tooltip ids are unique');
+  for (const m of body.matchAll(/aria-describedby="([^"]+)"/g)) assert.ok(ids.includes(m[1]), m[1]);
 });
 
 test('no route triggers an assessment', async () => {
