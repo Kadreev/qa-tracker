@@ -52,6 +52,7 @@ Triage (sends issue title, details, feature and surfaces to TypeSafe's Jev)
                                      that need triage (--refresh: also those Jev set; --all:
                                      every issue); confident answers are applied, the rest
                                      queued. Needs $TYPESAFE_API_KEY unless --dry-run
+                                     (prints the request bodies as one JSON array)
 
 Global options
   --dir <path>    data directory (default ./qa-tracker, or $QA_TRACKER_DIR)
@@ -252,12 +253,9 @@ export async function main(argv, io = {}) {
       case 'assess': {
         const sel = { ids: args, all: Boolean(opt.all), refresh: Boolean(opt.refresh) };
         const selected = selectIssues(store.data(), { ...sel, categories: cfg.categories });
+        if (opt['dry-run']) { println(JSON.stringify(dryRunRequests(store, selected), null, 2)); return 0; }
         if (!selected.length) {
           println(opt.json ? JSON.stringify(assessJson(emptyAssessResult(), store.data(), cfg.categories), null, 2) : 'nothing to assess');
-          return 0;
-        }
-        if (opt['dry-run']) {
-          for (const body of dryRunRequests(store, selected)) println(body);
           return 0;
         }
         const apiKey = (io.env ?? process.env).TYPESAFE_API_KEY;

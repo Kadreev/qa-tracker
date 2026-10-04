@@ -153,6 +153,9 @@ test('nothing to assess exits 0 without a key or a request', async () => {
   const r = await run(cwd, { env: {}, fetch }, 'assess');
   assert.equal(r.code, 0, r.err);
   assert.equal(r.out.trim(), 'nothing to assess');
+  const dry = await run(cwd, { env: {}, fetch }, 'assess', '--dry-run');
+  assert.equal(dry.code, 0, dry.err);
+  assert.deepEqual(JSON.parse(dry.out), []);
   const json = JSON.parse((await run(cwd, { env: {}, fetch }, 'assess', '--json')).out);
   assert.deepEqual(json, { assessment: null, model: null, rubric: 1, issues: {}, failed: {}, usage: { input_tokens: 0, output_tokens: 0 } });
   assert.equal(fetch.calls.length, 0);
@@ -163,13 +166,14 @@ test('--dry-run needs no key and sends nothing', async () => {
   const cwd = await tracker();
   for (const env of [{}, ENV]) {
     const fetch = fakeFetch();
-    const r = await run(cwd, { env, fetch }, 'assess', 'QA-1', '--dry-run');
+    const r = await run(cwd, { env, fetch }, 'assess', '--dry-run');
     assert.equal(r.code, 0, r.err);
     assert.equal(fetch.calls.length, 0);
-    const body = JSON.parse(r.out);
-    assert.equal(body.model, 'jev-latest');
+    const bodies = JSON.parse(r.out); // one JSON document: an array, one request per selected issue
+    assert.ok(Array.isArray(bodies));
+    assert.equal(bodies[0].model, 'jev-latest');
     assert.match(r.out, /"model": "jev-latest"/);
-    assert.equal(body.state.issue.title, 'Sort menu has no focus ring');
+    assert.deepEqual(bodies.map(b => b.state.issue.title), ['Sort menu has no focus ring', 'Huge paste freezes editor']);
     assert.ok(!r.out.includes('sk-'));
   }
   assert.equal(has(cwd, 'assessments.yaml'), false);

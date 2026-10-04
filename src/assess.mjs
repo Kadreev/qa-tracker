@@ -206,9 +206,9 @@ export function formatAssessReport(result, data, categories) {
   return lines;
 }
 
-/** dryRunRequests(store, issues) → the exact request bodies, pretty-printed, one per issue. */
+/** dryRunRequests(store, issues) → the exact request bodies, one per issue, in the order given. */
 export function dryRunRequests(store, issues) {
   const data = store.data();
   const { title, categories } = store.config;
-  return issues.map(issue => JSON.stringify(buildRequest(issue, data, { title, categories }), null, 2));
+  return issues.map(issue => buildRequest(issue, data, { title, categories }));
 }

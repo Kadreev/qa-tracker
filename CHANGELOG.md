@@ -22,7 +22,8 @@ All notable changes to this project are documented here. The format follows
   title, the issue's title and details (first 4,000 characters), its feature's
   name, area and routes, and the surfaces that list it are sent; recorded labels
   never are. The key is read from `TYPESAFE_API_KEY` and is never written or
-  printed; `--dry-run` prints the exact request bodies with no key and no network.
+  printed; `--dry-run` prints the exact request bodies (one JSON array) with no key
+  and no network.
 
 ### Changed
 - `severity` is no longer required on an issue; when present it must still be
