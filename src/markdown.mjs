@@ -3,10 +3,7 @@
 import { nextRunPlan } from './plan.mjs';
 import { flattenSurfaces, surfaceStats } from './surfaces.mjs';
 import { DEFAULT_TITLE } from './config.mjs';
-
-const DIM_ICON = { pass: '✅', issues: '⚠️', unknown: '❔' };
-const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
-const cell = s => String(s ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+import { DIM_ICON, SEV_ORDER, cell } from './format.mjs';
 
 export function renderMarkdown(data, { title = DEFAULT_TITLE } = {}) {
   const { features = [], issues = [], runs = [] } = data;

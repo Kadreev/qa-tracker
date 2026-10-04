@@ -41,7 +41,7 @@ export function page(data, { title }) {
     var dark = r.getAttribute('data-theme') ? r.getAttribute('data-theme') === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
     r.setAttribute('data-theme', dark ? 'light' : 'dark');
   });
-  function save(change, onOk) {
+  function save(change, onOk, onDone) {
     flash('Saving…');
     fetch('/api/edit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(change) })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
@@ -49,16 +49,22 @@ export function page(data, { title }) {
         if (res.ok && res.j.ok) { flash('Saved ✓'); if (onOk) onOk(); }
         else { flash((res.j && res.j.error) || 'Rejected', true); setTimeout(function () { location.reload(); }, 1500); }
       })
-      .catch(function () { flash('Network error', true); });
+      .catch(function () { flash('Network error', true); })
+      .then(function () { if (onDone) onDone(); });
   }
   app.addEventListener('click', function (e) {
     var act = e.target.getAttribute && e.target.getAttribute('data-act');
     if (!act) return;
     var row = e.target.closest('tr');
     if (act === 'w+' || act === 'w-') {
+      // The cell only changes once the save lands, so a second click before
+      // then would send the same value; hold the row's buttons until it does.
+      var btns = row.querySelectorAll('[data-act="w+"], [data-act="w-"]');
+      var setBusy = function (busy) { for (var i = 0; i < btns.length; i++) btns[i].disabled = busy; };
       var cell = row.querySelector('.wv');
       var w = Math.min(5, Math.max(1, parseInt(cell.textContent, 10) + (act === 'w+' ? 1 : -1)));
-      save({ kind: 'weight', feature: row.dataset.feature, value: w }, function () { cell.textContent = w; });
+      setBusy(true);
+      save({ kind: 'weight', feature: row.dataset.feature, value: w }, function () { cell.textContent = w; }, function () { setBusy(false); });
     }
     if (act === 'reverify') save({ kind: 'reverify', feature: row.dataset.feature, value: e.target.checked });
   });
@@ -125,7 +131,15 @@ export function createServer(store, { allowAnyHost = false } = {}) {
           return json(res, 415, { ok: false, error: 'expected application/json' });
         if (!sameOrigin(req.headers.origin, req.headers.host))
           return json(res, 403, { ok: false, error: 'cross-origin edit refused' });
-        const change = JSON.parse(await readBody(req) || '{}');
+        const raw = await readBody(req);
+        let change;
+        try {
+          change = JSON.parse(raw || '{}');
+        } catch {
+          return json(res, 400, { ok: false, error: 'body is not valid JSON' });
+        }
+        if (change == null || typeof change !== 'object' || Array.isArray(change))
+          return json(res, 400, { ok: false, error: 'body must be a JSON object' });
         if (!BROWSER_KINDS.includes(change.kind))
           return json(res, 400, { ok: false, error: `change kind not allowed from the dashboard: ${change.kind}` });
         const result = store.commit(change);

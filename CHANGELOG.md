@@ -19,6 +19,19 @@ All notable changes to this project are documented here. The format follows
   such as `yes` were silently stored as `false`.
 - `validate` reports empty or scalar list entries (a bare `-`) and malformed
   surfaces (`surfaces:` or `children:` that is not a list) instead of crashing.
+- Every tracker file is now written through a temp file and a rename, so a crash
+  or a sync client (OneDrive, Dropbox) never sees a half-written file. Edits that
+  touch two files (such as `add-issue`) still write them one after the other.
+- The dashboard server answers a malformed edit body (bad JSON, `null`, an
+  array) with 400 instead of 500.
+- Double-clicking a dashboard weight button no longer sends the same value twice;
+  the row's buttons are disabled until the save lands.
+- A value flag with no value (`serve --port`, `add-run --report`) is now an error;
+  before, `--port` alone made the dashboard listen on port 1 and `--report` alone
+  wrote `report: true`.
+- `init --root` is now written to `qa-tracker.config.json`; it was ignored.
+- `render` and every write remove a stale `SURFACES.md` once the last
+  `surfaces/*.yaml` file is gone.
 
 ### Changed
 - `verified-fixed` is now recorded only by a run (`add-run --verified`).

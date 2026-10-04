@@ -4,12 +4,11 @@
 // `test_refs`) exists; the store passes one rooted at the configured repo root.
 import {
   LEVELS, DIM_STATUS, SEVERITIES, ISSUE_TYPES, ISSUE_STATUS, DIMS, BLAST_RADIUS,
-  READ_ONLY_LEVEL_CAP, FEATURE_ID, RUN_ID, DATE, LEVEL_CHANGE,
+  READ_ONLY_LEVEL_CAP, FEATURE_ID, RUN_ID, DATE, LEVEL_CHANGE, RUN_REF,
 } from './schema.mjs';
 import { validateSurfaces } from './surfaces.mjs';
 
-/** Pulls the run id out of "2026-09-05 (run-2026-09-05)" or "… (run-2026-09-05-2; notes)". */
-export const RUN_REF = /\((run-[\w-]+)/;
+export { RUN_REF }; // kept here too: 0.1.0 exported it from this module
 
 function dupes(ids) {
   const seen = new Set(), out = new Set();

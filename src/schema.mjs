@@ -47,6 +47,8 @@ export const RUN_ID = /^run-\d{4}-\d{2}-\d{2}(-[\w-]+)?$/;
 export const DATE = /^\d{4}-\d{2}-\d{2}$/;
 /** A level change in runs.yaml: "L0->L2". */
 export const LEVEL_CHANGE = /^(L[0-4])->(L[0-4])$/;
+/** Pulls the run id out of "2026-09-05 (run-2026-09-05)" or "… (run-2026-09-05-2; notes)". */
+export const RUN_REF = /\((run-[\w-]+)/;
 
 /**
  * The coverage matrix: one row per feature, these columns in this order.

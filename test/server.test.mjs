@@ -69,6 +69,14 @@ test('refuses cross-origin, non-JSON, foreign-Host and non-dashboard edits', asy
   assert.doesNotMatch(readFileSync(path.join(dir, 'qa-tracker', 'features.yaml'), 'utf8'), /weight: 1\b/);
 });
 
+test('a malformed edit body is a 400, not a 500', async () => {
+  for (const body of ['{not json', 'null', '[1,2]', '"weight"']) {
+    const r = await request('POST', '/api/edit', { body, headers: { 'content-type': 'application/json' } });
+    assert.equal(r.status, 400, body);
+    assert.equal(JSON.parse(r.body).ok, false);
+  }
+});
+
 test('unknown paths are 404', async () => {
   assert.equal((await request('GET', '/nope')).status, 404);
 });

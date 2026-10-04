@@ -5,12 +5,11 @@ import { LEVELS, DIMS, ISSUE_STATUS } from './schema.mjs';
 import { nextRunPlan } from './plan.mjs';
 import { flattenSurfaces, surfaceStats } from './surfaces.mjs';
 import { DEFAULT_TITLE } from './config.mjs';
+import { DIM_ICON, SEV_ORDER } from './format.mjs';
 
 const idx = l => LEVELS.indexOf(l);
 export const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-const DIM_ICON = { pass: '✅', issues: '⚠️', unknown: '❔' };
-const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 const STATUS_ORDER = { fixed: 0, 'verified-fixed': 1, 'wont-fix': 2 };
 
 export const STYLE = `

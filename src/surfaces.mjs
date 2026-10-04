@@ -7,8 +7,9 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
 import {
-  SURFACE_KINDS, SURFACE_EFFECTS, SURFACE_COVERAGE, SURFACE_VERDICTS, READ_ONLY_EFFECTS,
+  SURFACE_KINDS, SURFACE_EFFECTS, SURFACE_COVERAGE, SURFACE_VERDICTS, READ_ONLY_EFFECTS, RUN_REF,
 } from './schema.mjs';
+import { cell } from './format.mjs';
 
 /** Read every surfaces/*.yaml (sorted by file name) → [{ file, area, roots }]. */
 export function loadSurfaceFiles(dir) {
@@ -64,7 +65,6 @@ function shapeErrors(files) {
   return errs;
 }
 
-const RUN_REF = /\((run-[\w-]+)/;
 const ID_SHAPE = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$/;
 
 /**
@@ -137,7 +137,6 @@ export function surfaceStats(flat) {
 
 const GLYPH = { pass: '✅', broken: '❌', blocked: '⛔', unchecked: '⬜' };
 const COV = { none: '', contract: ' `contract`', unit: ' `unit`', e2e: ' `e2e`' };
-const cell = s => String(s ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
 
 /** Render the nested checklist. Deterministic; no timestamps. */
 export function renderSurfaces(files, { features = [], title = 'UI Capability Inventory' } = {}) {

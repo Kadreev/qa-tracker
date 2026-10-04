@@ -52,7 +52,10 @@ Global options
 
 Docs: ${PKG.homepage}`;
 
-/** Minimal argv parser: positionals, --flag, --key value, --key=value. */
+/**
+ * Minimal argv parser: positionals, --flag, --key value, --key=value.
+ * Throws when a value flag has no value (`serve --port` would otherwise mean port 1).
+ */
 export function parseArgs(argv) {
   const pos = [], opt = {};
   for (let i = 0; i < argv.length; i++) {
@@ -61,7 +64,8 @@ export function parseArgs(argv) {
     const eq = a.indexOf('=');
     const key = a.slice(2, eq > 0 ? eq : undefined);
     if (eq > 0) opt[key] = a.slice(eq + 1);
-    else if (BOOLEAN_FLAGS.has(key) || i + 1 >= argv.length || argv[i + 1].startsWith('--')) opt[key] = true;
+    else if (BOOLEAN_FLAGS.has(key)) opt[key] = true;
+    else if (i + 1 >= argv.length || argv[i + 1].startsWith('--')) throw new Error(`--${key} needs a value`);
     else opt[key] = argv[++i];
   }
   return { pos, opt };
@@ -88,7 +92,12 @@ export async function main(argv, io = {}) {
   const println = s => out(s + '\n');
   const fail = msg => { err(`error: ${msg}\n`); return 1; };
 
-  const { pos, opt } = parseArgs(argv);
+  let pos, opt;
+  try {
+    ({ pos, opt } = parseArgs(argv));
+  } catch (e) {
+    return fail(e.message);
+  }
   const [cmd, ...args] = pos;
   if (opt.version) { println(PKG.version); return 0; }
   if (!cmd || cmd === 'help' || opt.help) { println(HELP); return cmd && cmd !== 'help' && !opt.help ? 1 : 0; }
@@ -102,9 +111,13 @@ export async function main(argv, io = {}) {
 
   if (cmd === 'init') {
     const title = typeof opt.title === 'string' ? opt.title : `${path.basename(path.dirname(cfg.dir))} — QA Tracker`;
-    const res = initTracker(cfg.dir, { title, force: Boolean(opt.force) });
+    // --root is given relative to the cwd; the config file stores it relative to the data dir.
+    const root = typeof opt.root === 'string'
+      ? path.relative(cfg.dir, cfg.root).split(path.sep).join('/') || '.'
+      : undefined;
+    const res = initTracker(cfg.dir, { title, root, force: Boolean(opt.force) });
     if (!res.ok) return fail(res.error);
-    createStore(resolveConfig({ dir: cfg.dir })).writeStatus();
+    createStore(resolveConfig({ dir: cfg.dir, root: cfg.root })).writeStatus();
     for (const f of res.written) println(`created ${path.relative(io.cwd ?? process.cwd(), f) || f}`);
     println(`\nNext: qa-tracker add-feature <id> --name "…" --area "…" --weight 3${opt.dir ? ` --dir ${opt.dir}` : ''}`);
     return 0;
