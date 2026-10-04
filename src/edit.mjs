@@ -109,6 +109,9 @@ export function applyChange(docs, change, { today = new Date().toISOString().sli
         if (!ISSUE_STATUS.includes(change.value)) return fail(`invalid status: ${change.value}`);
         const item = findById(docs.issues, change.issue);
         if (!item) return fail(`unknown issue: ${change.issue}`);
+        // verified-fixed means a run re-checked it; only a run may say so.
+        if (change.value === 'verified-fixed' && item.get('status') !== 'verified-fixed')
+          return fail(`verified-fixed is recorded by a run: qa-tracker add-run --verified ${change.issue}`);
         item.set('status', change.value);
         return { ok: true, touched: ['issues'] };
       }
@@ -177,8 +180,11 @@ function addRun(docs, r, today) {
   if (!BLAST_RADIUS.includes(r.blast_radius)) return fail(`blast_radius must be one of ${BLAST_RADIUS.join('|')}`);
   const levelChanges = r.level_changes ?? {};
   for (const [fid, change] of Object.entries(levelChanges)) {
-    if (!featureOf(docs, fid)) return fail(`level change for unknown feature: ${fid}`);
-    if (!LEVEL_CHANGE.test(change)) return fail(`level change for ${fid} must look like L0->L2, got ${change}`);
+    const feat = featureOf(docs, fid);
+    if (!feat) return fail(`level change for unknown feature: ${fid}`);
+    const m = LEVEL_CHANGE.exec(change);
+    if (!m) return fail(`level change for ${fid} must look like L0->L2, got ${change}`);
+    if (m[1] !== feat.get('current_level')) return fail(`level change ${fid}: ${change}, but ${fid} is at ${feat.get('current_level')}, not ${m[1]}`);
   }
   const touched = [...new Set([...(r.features_touched ?? []), ...Object.keys(levelChanges)])];
   const run = docs.runs.createNode({
@@ -197,8 +203,13 @@ function addRun(docs, r, today) {
   seqOf(docs.runs).add(run);
 
   // The run is the evidence; apply what it proves.
+  // last_validated only moves forward: a backdated run keeps the newer stamp.
   const stamp = `${date} (${id})`;
-  for (const fid of touched) featureOf(docs, fid)?.set('last_validated', stamp);
+  for (const fid of touched) {
+    const feat = featureOf(docs, fid);
+    const prev = String(feat?.get('last_validated') ?? '').slice(0, 10);
+    if (feat && !(prev > String(date))) feat.set('last_validated', stamp);
+  }
   for (const [fid, change] of Object.entries(levelChanges))
     featureOf(docs, fid).set('current_level', LEVEL_CHANGE.exec(change)[2]);
   for (const iid of r.issues_verified ?? []) {

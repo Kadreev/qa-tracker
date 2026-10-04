@@ -3,7 +3,7 @@
 //
 //   const store = createStore(resolveConfig({ dir: 'qa-tracker' }));
 //   store.commit({ kind: 'issue-status', issue: 'QA-1', value: 'fixed' });
-import { readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { parse, parseDocument, isSeq, isMap } from 'yaml';
 import { validate } from './validate.mjs';
@@ -17,6 +17,21 @@ export const YAML_OUT = { lineWidth: 0 };
 const ENTITIES = ['features', 'issues', 'runs'];
 
 const readText = file => (existsSync(file) ? readFileSync(file, 'utf8') : '');
+
+/**
+ * Write via a temp file and a rename, so a crash or a sync client (OneDrive,
+ * Dropbox) never sees a truncated file: readers get the old or the new content.
+ */
+export function writeAtomic(file, text) {
+  const tmp = `${file}.${process.pid}.tmp`;
+  writeFileSync(tmp, text);
+  try {
+    renameSync(tmp, file);
+  } catch (err) {
+    rmSync(tmp, { force: true });
+    throw err;
+  }
+}
 const asList = v => (v == null ? [] : v);
 
 export function createStore(cfg) {
@@ -33,9 +48,10 @@ export function createStore(cfg) {
   const check = d => validate(d, { exists });
 
   function writeStatus(d = data()) {
-    writeFileSync(files.status, renderMarkdown(d, { title: cfg.title }));
+    writeAtomic(files.status, renderMarkdown(d, { title: cfg.title }));
     if (d.surfaces.length)
-      writeFileSync(files.surfaces, renderSurfaces(d.surfaces, { features: d.features, title: `${cfg.title} — UI surfaces` }));
+      writeAtomic(files.surfaces, renderSurfaces(d.surfaces, { features: d.features, title: `${cfg.title} — UI surfaces` }));
+    else rmSync(files.surfaces, { force: true }); // generated; stale once the last surfaces file is gone
   }
 
   /** Apply one change, validate the would-be dataset, then write. → { ok, id? } | { ok:false, error } */
@@ -54,7 +70,7 @@ export function createStore(cfg) {
 
     for (const k of ENTITIES) {
       const out = docs[k].toString(YAML_OUT);
-      if (out !== before[k]) writeFileSync(files[k], out);
+      if (out !== before[k]) writeAtomic(files[k], out);
     }
     writeStatus(next);
     return { ok: true, id: applied.id };
@@ -90,7 +106,7 @@ export function createStore(cfg) {
       const errs = check(d);
       if (errs.length) return { ok: false, error: 'validation failed: ' + errs.join('; ') };
 
-      writeFileSync(full, doc.toString(YAML_OUT));
+      writeAtomic(full, doc.toString(YAML_OUT));
       writeStatus(d);
       return { ok: true, file };
     }

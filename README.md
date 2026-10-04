@@ -80,6 +80,8 @@ went. The target defaults from the feature's weight (4–5 → L4, 3 → L3, 1�
 ### The rules (enforced by `qa-tracker validate`)
 
 1. **No run, no level bump.** `current_level` only moves through `add-run --levels`.
+   `validate` replays `runs.yaml` from L0 and rejects a level the runs don't reach,
+   and a `verified-fixed` issue that no run verified.
 2. **Read-only runs cap at L2** and can only pass surfaces whose effect is `read`
    or `navigate`. L3/L4 need a `sandbox` or `test-account` run, never real data.
 3. **People own priority.** A run never overwrites `weight` or `target_level`.
@@ -127,7 +129,7 @@ Everything has a `--json` mode, and every command exits non-zero on rejection.
 | `add-issue --feature --severity --title [--type] [--id] [--source]` | New finding (ids default to `QA-n`), linked from its feature |
 | `add-run --blast-radius [--levels f=L2,g=L3] [--features] [--opened] [--verified] [--profiles] [--report]` | Record a run and apply it: levels, `last_validated`, `verified-fixed` |
 | `set <feature> weight\|target\|reverify\|functionality\|usability\|code_health <value>` | Edit a feature field |
-| `set <issue> status <open\|fixed\|verified-fixed\|wont-fix>` | Re-status a finding |
+| `set <issue> status <open\|fixed\|wont-fix>` | Re-status a finding (`verified-fixed` comes only from `add-run --verified`) |
 | `surfaces [--json]`, `surface <id>` | The UI checklist |
 | `verdict <surface> <pass\|broken\|blocked\|unchecked> --run <id> [--issues] [--notes]` | Record a surface verdict |
 | `render` | Regenerate `STATUS.md` / `SURFACES.md` |

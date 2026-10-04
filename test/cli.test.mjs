@@ -1,7 +1,7 @@
 // End-to-end: drive the CLI in a scratch project the way a person or agent would.
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -33,6 +33,30 @@ test('parseArgs handles positionals, flags and both value forms', () => {
   const { pos, opt } = parseArgs(['get', 'x', '--json', '--dir', 'd', '--title=A b']);
   assert.deepEqual(pos, ['get', 'x']);
   assert.deepEqual(opt, { json: true, dir: 'd', title: 'A b' });
+});
+
+test('a value flag without a value is an error, not `true`', async () => {
+  assert.throws(() => parseArgs(['serve', '--port']), /--port needs a value/);
+  assert.throws(() => parseArgs(['add-run', '--report', '--date', '2026-01-01']), /--report needs a value/);
+  const r = await run(project(), 'serve', '--port');
+  assert.equal(r.code, 1);
+  assert.match(r.err, /--port needs a value/);
+});
+
+test('init --root is written to the config, relative to the data directory', async () => {
+  const cwd = project();
+  assert.equal((await run(cwd, 'init', '--root', '..')).code, 0);
+  assert.equal(JSON.parse(read(cwd, 'qa-tracker.config.json')).root, '../..');
+  assert.equal(resolveConfig({ cwd, env: {} }).root, path.dirname(cwd));
+});
+
+test('writes leave no temporary files behind', async () => {
+  const cwd = project();
+  await run(cwd, 'init');
+  await run(cwd, 'add-feature', 'a', '--name', 'A', '--area', 'X');
+  await run(cwd, 'add-issue', '--feature', 'a', '--severity', 'low', '--title', 't');
+  assert.deepEqual(readdirSync(path.join(cwd, 'qa-tracker')).filter(f => f.includes('.tmp')), []);
+  assert.match(read(cwd, 'features.yaml'), /issues: \[ QA-1 \]/);
 });
 
 test('resolveConfig: --dir beats $QA_TRACKER_DIR beats ./qa-tracker; root defaults to the parent', () => {
@@ -104,6 +128,7 @@ test('writes that would break the dataset are refused and leave files untouched'
     ['set', 'a', 'weight', '9'],
     ['set', 'ghost', 'weight', '3'],
     ['set', 'a', 'colour', 'red'],
+    ['set', 'a', 'reverify', 'yes'],
     ['add-issue', '--feature', 'ghost', '--severity', 'low', '--title', 't'],
     ['add-feature', 'Bad Id', '--name', 'n', '--area', 'a'],
   ]) {
@@ -149,6 +174,11 @@ surfaces:
   assert.equal((await run(cwd, 'verdict', 'notes.list.delete', 'blocked', '--run', 'run-2026-01-12')).code, 1); // needs --notes
   assert.equal((await run(cwd, 'verdict', 'notes.list.delete', 'blocked', '--run', 'run-2026-01-12', '--notes', 'no data')).code, 0);
   assert.equal(JSON.parse((await run(cwd, 'surfaces', '--json')).out).length, 2);
+
+  // removing the last surfaces file removes the generated checklist too
+  rmSync(path.join(cwd, 'qa-tracker', 'surfaces', 'notes.yaml'));
+  assert.equal((await run(cwd, 'render')).code, 0);
+  assert.equal(existsSync(path.join(cwd, 'qa-tracker', 'SURFACES.md')), false);
 });
 
 test('the bundled demo validates and its generated files are up to date', async () => {

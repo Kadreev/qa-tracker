@@ -5,12 +5,11 @@ import { LEVELS, DIMS, ISSUE_STATUS } from './schema.mjs';
 import { nextRunPlan } from './plan.mjs';
 import { flattenSurfaces, surfaceStats } from './surfaces.mjs';
 import { DEFAULT_TITLE } from './config.mjs';
+import { DIM_ICON, SEV_ORDER } from './format.mjs';
 
 const idx = l => LEVELS.indexOf(l);
 export const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-const DIM_ICON = { pass: '✅', issues: '⚠️', unknown: '❔' };
-const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
 const STATUS_ORDER = { fixed: 0, 'verified-fixed': 1, 'wont-fix': 2 };
 
 export const STYLE = `
@@ -80,7 +79,7 @@ export function renderContent(data, { title = DEFAULT_TITLE } = {}) {
     <tr data-issue="${esc(i.id)}"><td>${esc(i.id)}</td><td class="sev ${esc(i.severity)}">${esc(i.severity)}</td>
     <td>${esc(i.type)}</td><td>${esc(i.title)}</td><td>${esc(i.feature)}</td>
     <td><span class="iv">${esc(i.status)}</span><select class="edit-only" data-act="istatus" aria-label="Status of ${esc(i.id)}">
-      ${ISSUE_STATUS.map(s => `<option ${s === i.status ? 'selected' : ''}>${s}</option>`).join('')}
+      ${ISSUE_STATUS.map(s => `<option ${s === i.status ? 'selected' : (s === 'verified-fixed' ? 'disabled title="Recorded by a run: add-run --verified"' : '')}>${s}</option>`).join('')}
     </select></td></tr>`).join('\n');
   const openRows = renderIssueRows([...open].sort((a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity]));
   const closedRows = renderIssueRows([...closed].sort((a, b) =>

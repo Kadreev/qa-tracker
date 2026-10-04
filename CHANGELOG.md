@@ -6,6 +6,40 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- `validate` now enforces "no run, no level bump": it replays `runs.yaml` from
+  L0 and rejects a `current_level` the runs don't reach, and a level change
+  whose starting level contradicts the earlier runs. Before, a hand-edited
+  `current_level` passed validation.
+- `add-run --levels` refuses a change like `sign-in:L0->L4` when the feature is
+  not at L0, instead of recording a run log that contradicts itself.
+- A backdated run (`add-run --date`) no longer overwrites a newer
+  `last_validated`.
+- `set <feature> reverify` accepts only `true`/`false`/`1`/`0`; other values
+  such as `yes` were silently stored as `false`.
+- `validate` reports empty or scalar list entries (a bare `-`) and malformed
+  surfaces (`surfaces:` or `children:` that is not a list) instead of crashing.
+- Every tracker file is now written through a temp file and a rename, so a crash
+  or a sync client (OneDrive, Dropbox) never sees a half-written file. Edits that
+  touch two files (such as `add-issue`) still write them one after the other.
+- The dashboard server answers a malformed edit body (bad JSON, `null`, an
+  array) with 400 instead of 500.
+- Double-clicking a dashboard weight button no longer sends the same value twice;
+  the row's buttons are disabled until the save lands.
+- A value flag with no value (`serve --port`, `add-run --report`) is now an error;
+  before, `--port` alone made the dashboard listen on port 1 and `--report` alone
+  wrote `report: true`.
+- `init --root` is now written to `qa-tracker.config.json`; it was ignored.
+- `render` and every write remove a stale `SURFACES.md` once the last
+  `surfaces/*.yaml` file is gone.
+
+### Changed
+- `verified-fixed` is now recorded only by a run (`add-run --verified`).
+  `set <issue> status verified-fixed` and the dashboard's status menu refuse it,
+  and `validate` rejects a `verified-fixed` issue that no run lists in
+  `issues_verified`. Hand-edited trackers that broke either evidence rule now
+  fail `validate`; record the missing run to fix them.
+
 ## [0.1.0] - 2026-10-04
 
 First public release, extracted from the in-repo tracker used by Stability Monitor.

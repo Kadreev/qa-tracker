@@ -7,8 +7,9 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
 import {
-  SURFACE_KINDS, SURFACE_EFFECTS, SURFACE_COVERAGE, SURFACE_VERDICTS, READ_ONLY_EFFECTS,
+  SURFACE_KINDS, SURFACE_EFFECTS, SURFACE_COVERAGE, SURFACE_VERDICTS, READ_ONLY_EFFECTS, RUN_REF,
 } from './schema.mjs';
+import { cell } from './format.mjs';
 
 /** Read every surfaces/*.yaml (sorted by file name) → [{ file, area, roots }]. */
 export function loadSurfaceFiles(dir) {
@@ -35,15 +36,35 @@ export function flattenSurfaces(files) {
     const flat = { ...node, feature, route, area: ctx.area, file: ctx.file, depth: ctx.depth, parent: ctx.parent ?? null };
     delete flat.children;
     out.push(flat);
-    for (const child of node.children ?? [])
+    for (const child of listOf(node.children))
       walk(child, { ...ctx, feature, route, depth: ctx.depth + 1, parent: node.id });
   };
   for (const { file, area, roots } of files)
-    for (const root of roots ?? []) walk(root, { file, area, depth: 0 });
+    for (const root of listOf(roots)) walk(root, { file, area, depth: 0 });
   return out;
 }
 
-const RUN_REF = /\((run-[\w-]+)/;
+const isMapping = v => v != null && typeof v === 'object' && !Array.isArray(v);
+/** The mapping items of a list; anything else is skipped (shapeErrors reports it). */
+const listOf = v => (Array.isArray(v) ? v.filter(isMapping) : []);
+
+/** Shape problems flattenSurfaces skips over: non-list roots/children, non-mapping items. */
+function shapeErrors(files) {
+  const errs = [];
+  const walk = (list, file, where) => list.forEach((n, i) => {
+    if (!isMapping(n)) return errs.push(`${where}: entry ${i + 1} must be a mapping, got ${JSON.stringify(n)}`);
+    if (n.children == null) return;
+    const at = `surface ${n.id ?? '(no id)'} [${file}]`;
+    if (!Array.isArray(n.children)) errs.push(`${at}: children must be a list`);
+    else walk(n.children, file, `${at} children`);
+  });
+  for (const { file, roots } of files) {
+    if (roots != null && !Array.isArray(roots)) errs.push(`${file}: surfaces must be a list`);
+    else walk(roots ?? [], file, file);
+  }
+  return errs;
+}
+
 const ID_SHAPE = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$/;
 
 /**
@@ -53,7 +74,7 @@ const ID_SHAPE = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$/;
  */
 export function validateSurfaces(files, { featureIds, issueIds, runIds, runRadius }, opts = {}) {
   const exists = opts.exists ?? (p => existsSync(path.resolve(opts.root ?? process.cwd(), p)));
-  const errs = [];
+  const errs = shapeErrors(files);
   const flat = flattenSurfaces(files);
   const seen = new Set();
   for (const s of flat) {
@@ -116,7 +137,6 @@ export function surfaceStats(flat) {
 
 const GLYPH = { pass: '✅', broken: '❌', blocked: '⛔', unchecked: '⬜' };
 const COV = { none: '', contract: ' `contract`', unit: ' `unit`', e2e: ' `e2e`' };
-const cell = s => String(s ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
 
 /** Render the nested checklist. Deterministic; no timestamps. */
 export function renderSurfaces(files, { features = [], title = 'UI Capability Inventory' } = {}) {
@@ -140,7 +160,7 @@ export function renderSurfaces(files, { features = [], title = 'UI Capability In
 
   const sections = files.map(({ area, roots }) => {
     const rootsFlat = flattenSurfaces([{ file: '', area, roots }]);
-    const byRoot = roots.map(r => {
+    const byRoot = listOf(roots).map(r => {
       const members = rootsFlat.filter(s => s.id === r.id || s.id.startsWith(r.id + '.'));
       return `### ${cell(r.name)} — \`${cell(r.route)}\`\n\n` + members.map(line).join('\n');
     }).join('\n\n');
