@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-04
+
+Tightens the evidence rules. Trackers whose YAML was hand-edited against them
+(a level with no run behind it, or `verified-fixed` with no run) now fail
+`validate`; record the missing run to fix them.
+
 ### Fixed
 - `validate` now enforces "no run, no level bump": it replays `runs.yaml` from
   L0 and rejects a `current_level` the runs don't reach, and a level change
@@ -63,5 +69,6 @@ First public release, extracted from the in-repo tracker used by Stability Monit
 - Programmatic API (`import { createStore } from 'qa-tracker'`).
 - Acme Notes demo dataset in `examples/demo`.
 
-[Unreleased]: https://github.com/Kadreev/qa-tracker/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Kadreev/qa-tracker/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Kadreev/qa-tracker/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Kadreev/qa-tracker/releases/tag/v0.1.0
