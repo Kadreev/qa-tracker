@@ -15,6 +15,14 @@ All notable changes to this project are documented here. The format follows
 - `validateAll(data, opts)` returns `{ errors, warnings }` and `store.check()`
   runs it on the stored data; warnings (a category outside the list, a dangling
   assessment reference, a hand-edited Jev value) never block a write.
+- `qa-tracker assess [ids…] [--all] [--refresh] [--json]` asks TypeSafe's Jev
+  for each issue's category, complexity and severity, applies the confident
+  answers by the triage policy and logs the run as one `assessments.yaml` entry.
+  By default it takes open issues with a field needing triage. Only the app
+  title, the issue's title and details (first 4,000 characters), its feature's
+  name, area and routes, and the surfaces that list it are sent; recorded labels
+  never are. The key is read from `TYPESAFE_API_KEY` and is never written or
+  printed; `--dry-run` prints the exact request bodies with no key and no network.
 
 ### Changed
 - `severity` is no longer required on an issue; when present it must still be

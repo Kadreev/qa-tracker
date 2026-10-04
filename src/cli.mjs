@@ -11,9 +11,10 @@ import { nextRunPlan } from './plan.mjs';
 import { renderMarkdown } from './markdown.mjs';
 import { flattenSurfaces, renderSurfaces } from './surfaces.mjs';
 import { DIMS, LEVELS } from './schema.mjs';
+import { selectIssues, assessAndCommit, assessJson, formatAssessReport, dryRunRequests, emptyAssessResult } from './assess.mjs';
 
 const PKG = JSON.parse(readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'));
-const BOOLEAN_FLAGS = new Set(['json', 'force', 'help', 'version', 'allow-any-host']);
+const BOOLEAN_FLAGS = new Set(['json', 'force', 'help', 'version', 'allow-any-host', 'all', 'refresh', 'dry-run']);
 
 export const HELP = `qa-tracker ${PKG.version} — evidence-based QA coverage tracking in plain YAML
 
@@ -44,6 +45,13 @@ Write (each validates the whole dataset first, then regenerates STATUS.md)
   set <issue> status <open|fixed|wont-fix>   (verified-fixed: add-run --verified)
   verdict <surface> <pass|broken|blocked|unchecked> --run <run-id> [--issues a,b] [--notes <text>]
   render                             rewrite STATUS.md (and SURFACES.md)
+
+Triage (sends issue title, details, feature and surfaces to TypeSafe's Jev)
+  assess [ids…] [--all] [--refresh] [--dry-run] [--json]
+                                     judge category, complexity and severity of open issues
+                                     that need triage (--refresh: also those Jev set; --all:
+                                     every issue); confident answers are applied, the rest
+                                     queued. Needs $TYPESAFE_API_KEY unless --dry-run
 
 Global options
   --dir <path>    data directory (default ./qa-tracker, or $QA_TRACKER_DIR)
@@ -240,6 +248,24 @@ export async function main(argv, io = {}) {
           report: opt.report,
         };
         return committed(store.commit({ kind: 'add-run', run }), r => `recorded ${r.id}`);
+      }
+      case 'assess': {
+        const sel = { ids: args, all: Boolean(opt.all), refresh: Boolean(opt.refresh) };
+        const selected = selectIssues(store.data(), { ...sel, categories: cfg.categories });
+        if (!selected.length) {
+          println(opt.json ? JSON.stringify(assessJson(emptyAssessResult(), store.data(), cfg.categories), null, 2) : 'nothing to assess');
+          return 0;
+        }
+        if (opt['dry-run']) {
+          for (const body of dryRunRequests(store, selected)) println(body);
+          return 0;
+        }
+        const apiKey = (io.env ?? process.env).TYPESAFE_API_KEY;
+        if (!apiKey) return fail('TYPESAFE_API_KEY is not set; export it (or use --dry-run to see what would be sent)');
+        const result = await assessAndCommit({ store, ...sel, apiKey, fetch: io.fetch, sleep: io.sleep });
+        if (opt.json) println(JSON.stringify(assessJson(result, store.data(), cfg.categories), null, 2));
+        else for (const line of formatAssessReport(result, store.data(), cfg.categories)) println(line);
+        return Object.keys(result.failed).length ? 1 : 0;
       }
       case 'serve': {
         const port = Number(opt.port ?? process.env.PORT ?? 4300);
