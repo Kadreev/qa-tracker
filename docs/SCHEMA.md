@@ -125,6 +125,10 @@ the run and applies it: it sets `current_level` from `level_changes`, stamps
 
 1. **Validate before committing.** `qa-tracker validate` must pass.
 2. **Level bumps need evidence.** Record the run first. No run, no bump.
+   `validate` replays `runs.yaml` in file order from L0: each `level_changes`
+   entry must start where the earlier runs left the feature, and `current_level`
+   must equal where the replay ends. An issue may be `verified-fixed` only if a
+   run lists it in `issues_verified`.
 3. **Read-only runs cap at L2.**
 4. **Never overwrite user intent** (`weight`, `target_level`, `name`, `area`, `routes`).
 5. **Keep YAML in serializer shape.** The tools write with `{ lineWidth: 0 }`;

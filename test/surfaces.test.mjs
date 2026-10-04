@@ -94,3 +94,14 @@ test('the renderer lists never-checked, non-automated surfaces and rolls up per 
   const [st] = surfaceStats(flattenSurfaces(data));
   assert.deepEqual({ total: st.total, pass: st.pass, unchecked: st.unchecked, automated: st.automated }, { total: 2, pass: 1, unchecked: 1, automated: 1 });
 });
+
+test('malformed surface shapes are reported, not thrown', () => {
+  const scalarRoots = [{ file: 'a.yaml', area: 'A', roots: 'notes.list' }];
+  assert.match(validateSurfaces(scalarRoots, refs, { exists }).join(), /a\.yaml: surfaces must be a list/);
+  const files = base();
+  files[0].roots[0].children = { id: 'notes.list.new' };
+  files[0].roots.push(null);
+  const errs = validateSurfaces(files, refs, { exists }).join('\n');
+  assert.match(errs, /surface notes\.list \[notes\.yaml\]: children must be a list/);
+  assert.match(errs, /notes\.yaml: entry 2 must be a mapping/);
+});

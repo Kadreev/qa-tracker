@@ -41,7 +41,7 @@ Write (each validates the whole dataset first, then regenerates STATUS.md)
           [--features a,b] [--opened QA-1] [--verified QA-2] [--profiles x,y]
           [--report <path>] [--date YYYY-MM-DD] [--id run-…]
   set <feature> weight|target|reverify|functionality|usability|code_health <value>
-  set <issue> status <open|fixed|verified-fixed|wont-fix>
+  set <issue> status <open|fixed|wont-fix>   (verified-fixed: add-run --verified)
   verdict <surface> <pass|broken|blocked|unchecked> --run <run-id> [--issues a,b] [--notes <text>]
   render                             rewrite STATUS.md (and SURFACES.md)
 
@@ -180,7 +180,11 @@ export async function main(argv, io = {}) {
         const change = {
           weight: () => ({ kind: 'weight', feature: id, value: Number(value) }),
           target: () => ({ kind: 'target', feature: id, value }),
-          reverify: () => ({ kind: 'reverify', feature: id, value: value === 'true' || value === '1' }),
+          reverify: () => {
+            const b = { true: true, 1: true, false: false, 0: false }[value.toLowerCase()];
+            if (b === undefined) throw new Error(`reverify must be true|false, got "${value}"`);
+            return { kind: 'reverify', feature: id, value: b };
+          },
           status: () => ({ kind: 'issue-status', issue: id, value }),
           ...Object.fromEntries(DIMS.map(d => [d, () => ({ kind: 'dimension', feature: id, dim: d, value })])),
         }[field];

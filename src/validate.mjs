@@ -18,12 +18,18 @@ function dupes(ids) {
 }
 
 const blank = v => typeof v !== 'string' || !v.trim();
+const isMapping = v => v != null && typeof v === 'object' && !Array.isArray(v);
 
 export function validate({ features = [], issues = [], runs = [], surfaces = [] }, opts = {}) {
   const errs = [];
   for (const [label, list] of [['features.yaml', features], ['issues.yaml', issues], ['runs.yaml', runs]])
     if (!Array.isArray(list)) errs.push(`${label} must be a YAML list`);
   if (errs.length) return errs;
+
+  // A bare "-" or a scalar item is reported here and left out of every later check.
+  for (const [label, list] of [['features.yaml', features], ['issues.yaml', issues], ['runs.yaml', runs]])
+    list.forEach((x, i) => { if (!isMapping(x)) errs.push(`${label} entry ${i + 1} must be a mapping, got ${JSON.stringify(x)}`); });
+  [features, issues, runs] = [features, issues, runs].map(list => list.filter(isMapping));
 
   const featIds = new Set(features.map(f => f.id));
   const issueIds = new Set(issues.map(i => i.id));
@@ -86,6 +92,28 @@ export function validate({ features = [], issues = [], runs = [], surfaces = [] 
         errs.push(`${at}: read-only run cannot raise ${fid} above ${READ_ONLY_LEVEL_CAP} (got ${m[2]})`);
     }
   }
+
+  // Rule 1: no run, no level bump. Replay runs.yaml in file order (it is
+  // append-only) from L0; every change must start where the previous runs left
+  // the feature, and each feature's current_level must be where the replay ends.
+  const replayed = new Map([...featIds].map(id => [id, 'L0']));
+  for (const r of runs)
+    for (const [fid, change] of Object.entries(r.level_changes ?? {})) {
+      const m = LEVEL_CHANGE.exec(String(change));
+      if (!m || !replayed.has(fid)) continue; // reported above
+      if (m[1] !== replayed.get(fid))
+        errs.push(`run ${r.id}: ${fid} change ${change} starts from ${m[1]}, but earlier runs put it at ${replayed.get(fid)}`);
+      replayed.set(fid, m[2]);
+    }
+  for (const f of features)
+    if (LEVELS.includes(f.current_level) && replayed.has(f.id) && f.current_level !== replayed.get(f.id))
+      errs.push(`feature ${f.id}: current_level ${f.current_level} is not backed by runs (runs give ${replayed.get(f.id)}); record the run with add-run --levels`);
+
+  // verified-fixed means a run re-checked it, so some run must say so.
+  const verified = new Set(runs.flatMap(r => r.issues_verified ?? []));
+  for (const i of issues)
+    if (i.status === 'verified-fixed' && !verified.has(i.id))
+      errs.push(`issue ${i.id}: status verified-fixed but no run lists it in issues_verified; record it with add-run --verified`);
 
   errs.push(...validateSurfaces(surfaces, { featureIds: featIds, issueIds, runIds, runRadius }, opts));
   return errs;

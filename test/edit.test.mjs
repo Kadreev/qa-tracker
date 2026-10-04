@@ -115,6 +115,28 @@ test('add-run rejects unknown features and malformed level changes', () => {
   assert.equal(applyChange(d, { kind: 'add-run', run: { blast_radius: 'yolo' } }).ok, false);
 });
 
+test('add-run refuses a level change that does not start at the current level', () => {
+  const d = docs();
+  const r = applyChange(d, { kind: 'add-run', run: { blast_radius: 'sandbox', level_changes: { 'notes-list': 'L2->L3' } } });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /notes-list is at L0, not L2/);
+});
+
+test('a backdated run does not overwrite a newer last_validated', () => {
+  const d = docs();
+  applyChange(d, { kind: 'add-run', run: { blast_radius: 'sandbox', features_touched: ['notes-list'], date: '2026-02-01' } });
+  applyChange(d, { kind: 'add-run', run: { blast_radius: 'sandbox', features_touched: ['notes-list'], date: '2026-01-15' } });
+  assert.match(d.features.toString(), /last_validated: 2026-02-01 \(run-2026-02-01\)/);
+});
+
+test('verified-fixed is set by a run, not by a status edit', () => {
+  const d = docs();
+  const r = applyChange(d, { kind: 'issue-status', issue: 'QA-1', value: 'verified-fixed' });
+  assert.equal(r.ok, false);
+  assert.match(r.error, /add-run --verified QA-1/);
+  assert.equal(applyChange(d, { kind: 'issue-status', issue: 'QA-1', value: 'fixed' }).ok, true);
+});
+
 test('id helpers', () => {
   const d = docs();
   assert.equal(nextId(d.issues, 'QA-'), 'QA-2');

@@ -80,7 +80,7 @@ export function renderContent(data, { title = DEFAULT_TITLE } = {}) {
     <tr data-issue="${esc(i.id)}"><td>${esc(i.id)}</td><td class="sev ${esc(i.severity)}">${esc(i.severity)}</td>
     <td>${esc(i.type)}</td><td>${esc(i.title)}</td><td>${esc(i.feature)}</td>
     <td><span class="iv">${esc(i.status)}</span><select class="edit-only" data-act="istatus" aria-label="Status of ${esc(i.id)}">
-      ${ISSUE_STATUS.map(s => `<option ${s === i.status ? 'selected' : ''}>${s}</option>`).join('')}
+      ${ISSUE_STATUS.map(s => `<option ${s === i.status ? 'selected' : (s === 'verified-fixed' ? 'disabled title="Recorded by a run: add-run --verified"' : '')}>${s}</option>`).join('')}
     </select></td></tr>`).join('\n');
   const openRows = renderIssueRows([...open].sort((a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity]));
   const closedRows = renderIssueRows([...closed].sort((a, b) =>

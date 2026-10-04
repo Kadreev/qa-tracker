@@ -104,6 +104,7 @@ test('writes that would break the dataset are refused and leave files untouched'
     ['set', 'a', 'weight', '9'],
     ['set', 'ghost', 'weight', '3'],
     ['set', 'a', 'colour', 'red'],
+    ['set', 'a', 'reverify', 'yes'],
     ['add-issue', '--feature', 'ghost', '--severity', 'low', '--title', 't'],
     ['add-feature', 'Bad Id', '--name', 'n', '--area', 'a'],
   ]) {

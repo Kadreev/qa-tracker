@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- `validate` now enforces "no run, no level bump": it replays `runs.yaml` from
+  L0 and rejects a `current_level` the runs don't reach, and a level change
+  whose starting level contradicts the earlier runs. Before, a hand-edited
+  `current_level` passed validation.
+- `add-run --levels` refuses a change like `sign-in:L0->L4` when the feature is
+  not at L0, instead of recording a run log that contradicts itself.
+- A backdated run (`add-run --date`) no longer overwrites a newer
+  `last_validated`.
+- `set <feature> reverify` accepts only `true`/`false`/`1`/`0`; other values
+  such as `yes` were silently stored as `false`.
+- `validate` reports empty or scalar list entries (a bare `-`) and malformed
+  surfaces (`surfaces:` or `children:` that is not a list) instead of crashing.
+
+### Changed
+- `verified-fixed` is now recorded only by a run (`add-run --verified`).
+  `set <issue> status verified-fixed` and the dashboard's status menu refuse it,
+  and `validate` rejects a `verified-fixed` issue that no run lists in
+  `issues_verified`. Hand-edited trackers that broke either evidence rule now
+  fail `validate`; record the missing run to fix them.
+
 ## [0.1.0] - 2026-10-04
 
 First public release, extracted from the in-repo tracker used by Stability Monitor.
