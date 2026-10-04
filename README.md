@@ -126,10 +126,12 @@ Everything has a `--json` mode, and every command exits non-zero on rejection.
 | `get <id> [--json]` | One feature, issue or run |
 | `validate` | Check every rule; non-zero exit on any error |
 | `add-feature <id> --name --area [--weight] [--target] [--routes a,b]` | New matrix row at L0 |
-| `add-issue --feature --severity --title [--type] [--id] [--source]` | New finding (ids default to `QA-n`), linked from its feature |
+| `add-issue --feature --title [--severity] [--details] [--category] [--complexity] [--type] [--id] [--source] [--assess\|--no-assess]` | New finding (ids default to `QA-n`), linked from its feature; without `--severity` it joins the triage queue |
+| `triage [--json]` | Issues needing a person: missing values and Jev disagreements |
 | `add-run --blast-radius [--levels f=L2,g=L3] [--features] [--opened] [--verified] [--profiles] [--report]` | Record a run and apply it: levels, `last_validated`, `verified-fixed` |
 | `set <feature> weight\|target\|reverify\|functionality\|usability\|code_health <value>` | Edit a feature field |
 | `set <issue> status <open\|fixed\|wont-fix>` | Re-status a finding (`verified-fixed` comes only from `add-run --verified`) |
+| `set <issue> category\|complexity\|severity\|details <value>` | Record an explicit value (confirms or overrides Jev) |
 | `surfaces [--json]`, `surface <id>` | The UI checklist |
 | `verdict <surface> <pass\|broken\|blocked\|unchecked> --run <id> [--issues] [--notes]` | Record a surface verdict |
 | `render` | Regenerate `STATUS.md` / `SURFACES.md` |

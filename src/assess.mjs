@@ -129,7 +129,7 @@ export function emptyAssessResult() {
 }
 
 /** The number shown for a judgment: `top` for complexity, `confidence` otherwise. */
-const shownConfidence = (field, j) => (field === 'complexity' ? j.top : j.confidence);
+export const shownConfidence = (field, j) => (field === 'complexity' ? j.top : j.confidence);
 
 /**
  * assessFields(judgments, { issue, applied, queue }) → { [field]: { value, confidence, applied, queue } }

@@ -24,10 +24,23 @@ All notable changes to this project are documented here. The format follows
   never are. The key is read from `TYPESAFE_API_KEY` and is never written or
   printed; `--dry-run` prints the exact request bodies (one JSON array) with no key
   and no network.
+- `qa-tracker triage [--json]` lists the issues that still need a person: a
+  missing category, complexity or severity, and Jev answers that disagree with
+  an explicit value. `get <issue>` shows where each value came from, the latest
+  assessment and any warnings that name the issue.
+- `set <issue> category|complexity|severity|details <value>` records an explicit
+  value; setting a value Jev disagreed with clears it from the triage queue.
+- `add-issue` takes `--details`, `--category`, `--complexity` and an optional
+  `--severity`; an issue added without severity lands in the triage queue.
+- Opt-in auto-assess: with `jev.auto_assess: true` in the config (or `--assess`),
+  `add-issue` sends the new issue to Jev and applies the confident answers;
+  `--no-assess` skips it. A missing key or a failed request prints a warning and
+  the issue is still saved.
 
 ### Changed
 - `severity` is no longer required on an issue; when present it must still be
   one of `critical`, `high`, `medium` or `low`.
+- `validate` prints warnings (`warning: …`, exit 0) alongside its errors.
 
 ## [0.2.0] - 2026-10-04
 
