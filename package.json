@@ -1,0 +1,55 @@
+{
+  "name": "qa-tracker",
+  "version": "0.1.0",
+  "description": "Evidence-based QA coverage tracking in plain YAML: a feature matrix with a validation ladder, findings, runs and a UI surface checklist — with a CLI built for AI agents and a local dashboard for people.",
+  "keywords": [
+    "qa",
+    "quality-assurance",
+    "testing",
+    "test-coverage",
+    "coverage-matrix",
+    "manual-testing",
+    "exploratory-testing",
+    "ai-agents",
+    "llm",
+    "yaml",
+    "cli"
+  ],
+  "homepage": "https://github.com/Kadreev/qa-tracker#readme",
+  "bugs": "https://github.com/Kadreev/qa-tracker/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kadreev/qa-tracker.git"
+  },
+  "license": "MIT",
+  "author": "Kadreev",
+  "type": "module",
+  "bin": {
+    "qa-tracker": "bin/qa-tracker.mjs"
+  },
+  "exports": {
+    ".": "./src/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "bin",
+    "src",
+    "templates",
+    "docs/SCHEMA.md",
+    "skills",
+    "SECURITY.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "node --test && node bin/qa-tracker.mjs validate --dir examples/demo",
+    "demo": "node bin/qa-tracker.mjs serve --dir examples/demo",
+    "demo:render": "node bin/qa-tracker.mjs render --dir examples/demo"
+  },
+  "dependencies": {
+    "yaml": "^2.9.0"
+  },
+  "packageManager": "pnpm@10.26.1"
+}

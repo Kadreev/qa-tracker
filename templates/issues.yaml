@@ -1,0 +1,14 @@
+# Issues — every finding, forever. Never delete one; change its status instead.
+# Ids are permanent handles: reuse the id your issue tracker gives the finding
+# (e.g. GH-123, JIRA-45) or let the CLI number them QA-1, QA-2, …
+#
+# Add one with:  npx qa-tracker add-issue --feature sign-in --severity high --title "Login button does nothing on Safari"
+#
+# - id: QA-1
+#   title: Login button does nothing on Safari
+#   severity: high                # critical | high | medium | low
+#   type: functionality           # code | functionality | usability
+#   feature: sign-in              # must match a feature id
+#   status: open                  # open | fixed | verified-fixed | wont-fix
+#   source: https://github.com/acme/app/issues/123
+[]

@@ -1,0 +1,19 @@
+# QA runs, append-only. Each one is the evidence behind the level changes it lists.
+- id: run-2026-01-12
+  date: 2026-01-12
+  profiles: [ smoke-walkthrough ]
+  blast_radius: read-only
+  features_touched: [ sign-in, notes-list, note-editor, settings ]
+  level_changes: { sign-in: "L0->L2", notes-list: "L0->L2", note-editor: "L0->L1", settings: "L0->L2" }
+  issues_opened: [ QA-1, QA-2, QA-4 ]
+  issues_verified: []
+  report: https://github.com/acme/notes/wiki/QA-2026-01-12
+- id: run-2026-01-20
+  date: 2026-01-20
+  profiles: [ bug-hunter, usability-reviewer ]
+  blast_radius: sandbox
+  features_touched: [ sign-in, notes-list, search ]
+  level_changes: { sign-in: "L2->L3", search: "L0->L2" }
+  issues_opened: [ QA-3, QA-5 ]
+  issues_verified: [ QA-1 ]
+  report: https://github.com/acme/notes/wiki/QA-2026-01-20

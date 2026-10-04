@@ -1,0 +1,77 @@
+# Notes area — UI capability inventory. Every thing a user can see or do on
+# /notes, nested to the control level. Verdicts only come from recorded runs.
+area: Notes
+surfaces:
+  - id: notes.list
+    feature: notes-list
+    kind: view
+    name: Notes list
+    route: /notes
+    ui: Grid of note cards with a toolbar (new note, sort, view toggle) and a pinned row on top
+    expected: Shows the signed-in user's notes, pinned first, newest first
+    effect: read
+    api: [ GET /api/notes ]
+    coverage: e2e
+    test_refs: [ tests/notes-list.spec.js ]
+    verdict: pass
+    checked: 2026-01-12 (run-2026-01-12)
+    children:
+      - id: notes.list.new
+        kind: action
+        name: New note
+        ui: Primary button "New note" in the toolbar
+        expected: Creates an empty note and opens it in the editor
+        effect: mutate
+        api: [ POST /api/notes ]
+        coverage: e2e
+        test_refs: [ tests/notes-list.spec.js ]
+        verdict: pass
+        checked: 2026-01-20 (run-2026-01-20)
+      - id: notes.list.sort
+        kind: control
+        name: Sort menu
+        ui: Dropdown with Newest, Oldest, Title A–Z
+        expected: Reorders the cards without a reload; reachable and operable by keyboard
+        effect: read
+        coverage: none
+        verdict: broken
+        checked: 2026-01-20 (run-2026-01-20)
+        issues: [ QA-3 ]
+      - id: notes.list.card
+        kind: panel
+        name: Note card
+        ui: Title, first line of the body, updated-at time and a ••• menu
+        expected: Opens the note on click; the menu offers Pin, Duplicate and Delete
+        effect: navigate
+        coverage: none
+        verdict: pass
+        checked: 2026-01-12 (run-2026-01-12)
+        children:
+          - id: notes.list.card.delete
+            kind: action
+            name: Delete note
+            ui: Delete item in the card menu, with a confirm dialog
+            expected: Removes the card immediately, including from the pinned row
+            effect: mutate
+            api: [ DELETE /api/notes/:id ]
+            coverage: none
+            verdict: unchecked
+          - id: notes.list.card.duplicate
+            kind: action
+            name: Duplicate note
+            ui: Duplicate item in the card menu
+            expected: Adds a "Copy of …" card at the top
+            effect: mutate
+            api: [ POST /api/notes/:id/duplicate ]
+            coverage: none
+            verdict: unchecked
+      - id: notes.list.empty
+        kind: state
+        name: Empty state
+        ui: Illustration and "Write your first note" call to action
+        expected: Shown when the user has no notes; the call to action creates one
+        effect: read
+        coverage: none
+        verdict: blocked
+        checked: 2026-01-20 (run-2026-01-20)
+        notes: The sandbox account always has seeded notes; needs a fresh account.

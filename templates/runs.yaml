@@ -1,0 +1,15 @@
+# QA runs — append-only. A run is the evidence: current_level may only rise
+# for checks that passed in a run listed here.
+#
+# Record one with:  npx qa-tracker add-run --blast-radius sandbox --levels sign-in=L2 --opened QA-1
+#
+# - id: run-2026-01-31            # run-YYYY-MM-DD, suffix -2 for a second run that day
+#   date: 2026-01-31
+#   profiles: [ bug-hunter ]      # who or what ran it (free text)
+#   blast_radius: sandbox         # read-only | sandbox | test-account   (read-only caps at L2)
+#   features_touched: [ sign-in ]
+#   level_changes: { sign-in: "L0->L2" }
+#   issues_opened: [ QA-1 ]
+#   issues_verified: []
+#   report: docs/qa/2026-01-31.md
+[]

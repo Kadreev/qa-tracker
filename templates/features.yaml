@@ -1,0 +1,21 @@
+# Features — one row of the coverage matrix each.
+# Schema: https://github.com/Kadreev/qa-tracker/blob/main/docs/SCHEMA.md
+#
+# weight and target_level are YOURS (user-owned); a QA run may only write
+# current_level, dimensions, issues, reverify and last_validated.
+#
+# Add one with:  npx qa-tracker add-feature sign-in --name "Sign in" --area Auth --weight 4
+#
+# - id: sign-in                   # kebab-case, unique, stable forever
+#   name: Sign in
+#   area: Auth                    # nav or subsystem grouping
+#   routes: [ /login ]
+#   weight: 4                     # priority and risk, 1-5
+#   target_level: L4              # defaults from weight: 4-5 -> L4, 3 -> L3, 1-2 -> L2
+#   current_level: L0             # highest level fully passed in a recorded run
+#   dimensions: { functionality: unknown, usability: unknown, code_health: unknown }
+#   issues: []
+#   reverify: false               # a linked issue was fixed and needs re-checking
+#   last_validated: 2026-01-31 (run-2026-01-31)
+#   notes: ""
+[]

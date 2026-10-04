@@ -1,0 +1,73 @@
+# Demo tracker for "Acme Notes", a made-up note-taking web app.
+# Try it: npx qa-tracker serve --dir examples/demo
+- id: sign-in
+  name: Sign in / sign up
+  area: Auth
+  routes: [ /login, /signup ]
+  weight: 4
+  target_level: L4
+  current_level: L3
+  dimensions: { functionality: pass, usability: pass, code_health: pass }
+  issues: [ QA-1 ]
+  reverify: false
+  last_validated: 2026-01-20 (run-2026-01-20)
+  notes: Password reset e-mail not exercised yet (needs a test inbox).
+- id: notes-list
+  name: Notes list
+  area: Notes
+  routes: [ /notes ]
+  weight: 5
+  target_level: L4
+  current_level: L2
+  dimensions: { functionality: issues, usability: issues, code_health: pass }
+  issues: [ QA-2, QA-3 ]
+  reverify: true
+  last_validated: 2026-01-20 (run-2026-01-20)
+  notes: ""
+- id: note-editor
+  name: Note editor
+  area: Notes
+  routes: [ /notes/:id ]
+  weight: 5
+  target_level: L4
+  current_level: L1
+  dimensions: { functionality: issues, usability: pass, code_health: unknown }
+  issues: [ QA-4 ]
+  reverify: false
+  last_validated: 2026-01-12 (run-2026-01-12)
+  notes: Autosave loses the last keystrokes when the tab closes (QA-4).
+- id: sharing
+  name: Share a note
+  area: Collaboration
+  routes: [ /notes/:id/share ]
+  weight: 3
+  target_level: L3
+  current_level: L0
+  dimensions: { functionality: unknown, usability: unknown, code_health: unknown }
+  issues: []
+  reverify: false
+  notes: Never exercised.
+- id: search
+  name: Search
+  area: Notes
+  routes: [ /search ]
+  weight: 3
+  target_level: L3
+  current_level: L2
+  dimensions: { functionality: pass, usability: issues, code_health: pass }
+  issues: [ QA-5 ]
+  reverify: false
+  last_validated: 2026-01-20 (run-2026-01-20)
+  notes: ""
+- id: settings
+  name: Account settings
+  area: Settings
+  routes: [ /settings ]
+  weight: 2
+  target_level: L2
+  current_level: L2
+  dimensions: { functionality: pass, usability: pass, code_health: pass }
+  issues: []
+  reverify: false
+  last_validated: 2026-01-12 (run-2026-01-12)
+  notes: ""

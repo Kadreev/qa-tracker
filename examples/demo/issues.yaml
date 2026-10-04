@@ -1,0 +1,34 @@
+# Every finding the demo runs raised. Never deleted, only re-statused.
+- id: QA-1
+  title: Sign-up form accepts an e-mail with a trailing space and then cannot sign in
+  severity: medium
+  type: functionality
+  feature: sign-in
+  status: verified-fixed
+  source: https://github.com/acme/notes/issues/12
+- id: QA-2
+  title: Deleting a pinned note leaves an empty card until reload
+  severity: high
+  type: functionality
+  feature: notes-list
+  status: fixed
+  source: https://github.com/acme/notes/issues/15
+- id: QA-3
+  title: Sort menu has no keyboard focus ring
+  severity: low
+  type: usability
+  feature: notes-list
+  status: open
+- id: QA-4
+  title: Autosave drops the last 2 seconds of typing when the tab is closed
+  severity: critical
+  type: functionality
+  feature: note-editor
+  status: open
+  source: https://github.com/acme/notes/issues/18
+- id: QA-5
+  title: No-results state says "Error" instead of explaining there were no matches
+  severity: medium
+  type: usability
+  feature: search
+  status: open
