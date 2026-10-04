@@ -169,6 +169,12 @@ test('Jev-owned cells carry a confidence tooltip, others none', () => {
   assert.ok(r.includes('title="Jev 62%"'), r);
   assert.ok(r.includes('title="Jev"'), 'severity whose assessment is missing gets a bare Jev title');
   assert.ok(!rowOf('QA-3').includes('title="Jev'));
+  // The visible ᴶ marker matches STATUS.md; user-set and unset cells carry none.
+  assert.ok(r.includes('<td title="Jev 91%"><span class="iv">accessibilityᴶ</span>'), r);
+  assert.ok(r.includes('<span class="iv">5ᴶ</span>'));
+  assert.ok(r.includes('<span class="iv">highᴶ</span>'));
+  assert.ok(!rowOf('QA-3').includes('ᴶ'));
+  assert.ok(!rowOf('QA-2').includes('ᴶ'));
 });
 
 test('edit-mode selects for category, complexity and severity', () => {

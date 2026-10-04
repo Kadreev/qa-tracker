@@ -64,6 +64,10 @@ function jevTitle(issue, field, assessments) {
   return ` title="${typeof confidence === 'number' ? `Jev ${pct(confidence)}` : 'Jev'}"`;
 }
 
+/** A field's value, or — when unset; suffixed ᴶ while its triage source is Jev (as in STATUS.md). */
+const shown = (issue, field) =>
+  (issue[field] == null ? '—' : `${esc(issue[field])}${issue.triage?.[field]?.source === 'jev' ? 'ᴶ' : ''}`);
+
 /** An edit-mode <select>; an unset field shows a disabled — so it cannot be submitted. */
 function triageSelect(act, label, issue, values, current) {
   const list = current == null || values.includes(current) ? values : [...values, current];
@@ -104,9 +108,9 @@ export function renderContent(data, { title = DEFAULT_TITLE, categories = resolv
   const names = categories.map(c => c.name);
   const renderIssueRows = list => list.map(i => `
     <tr data-issue="${esc(i.id)}"><td>${esc(i.id)}</td>
-    <td class="sev ${esc(i.severity ?? 'none')}"${jevTitle(i, 'severity', data.assessments)}><span class="iv">${esc(i.severity ?? '—')}</span>${triageSelect('iseverity', 'Severity', i, SEVERITIES, i.severity)}</td>
-    <td${jevTitle(i, 'category', data.assessments)}><span class="iv">${esc(i.category ?? '—')}</span>${triageSelect('icategory', 'Category', i, names, i.category)}</td>
-    <td${jevTitle(i, 'complexity', data.assessments)}><span class="iv">${esc(i.complexity ?? '—')}</span>${triageSelect('icomplexity', 'Complexity', i, COMPLEXITIES, i.complexity)}</td>
+    <td class="sev ${esc(i.severity ?? 'none')}"${jevTitle(i, 'severity', data.assessments)}><span class="iv">${shown(i, 'severity')}</span>${triageSelect('iseverity', 'Severity', i, SEVERITIES, i.severity)}</td>
+    <td${jevTitle(i, 'category', data.assessments)}><span class="iv">${shown(i, 'category')}</span>${triageSelect('icategory', 'Category', i, names, i.category)}</td>
+    <td${jevTitle(i, 'complexity', data.assessments)}><span class="iv">${shown(i, 'complexity')}</span>${triageSelect('icomplexity', 'Complexity', i, COMPLEXITIES, i.complexity)}</td>
     <td>${esc(i.feature)}</td><td>${esc(i.title)}</td>
     <td><span class="iv">${esc(i.status)}</span><select class="edit-only" data-act="istatus" aria-label="Status of ${esc(i.id)}">
       ${ISSUE_STATUS.map(s => `<option ${s === i.status ? 'selected' : (s === 'verified-fixed' ? 'disabled title="Recorded by a run: add-run --verified"' : '')}>${s}</option>`).join('')}
