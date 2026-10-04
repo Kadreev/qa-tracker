@@ -5,7 +5,12 @@ import assert from 'node:assert/strict';
 import { askJev, JevError, API_URL } from '../src/jev-client.mjs';
 
 const KEY = 'sk-secret-123';
-const OK_BODY = { model: 'jev-latest', answers: ['a', 'b', 'c'], usage: { input_tokens: 5, output_tokens: 2 } };
+// `answers` is an object keyed by question id, as the API documents it.
+const OK_BODY = {
+  model: 'jev-1.13.0',
+  answers: { severity: { type: 'choice', choice: 'low', confidence: 0.9, probabilities: { low: 0.95, medium: 0.05 } } },
+  usage: { input_tokens: 5, output_tokens: 2 },
+};
 
 function reply(status, body) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
@@ -143,6 +148,9 @@ test('a network error is retried, a malformed body is not', async () => {
   const bad = fakeFetch([reply(200, {})]);
   await assert.rejects(askJev({}, { apiKey: KEY, fetch: bad, sleep: fakeSleep() }), /malformed/);
   assert.equal(bad.calls.length, 1);
+
+  const list = fakeFetch([reply(200, { model: 'jev-1.13.0', answers: ['a'], usage: {} })]);
+  await assert.rejects(askJev({}, { apiKey: KEY, fetch: list, sleep: fakeSleep() }), /malformed/);
 
   const notJson = fakeFetch([{ ok: true, status: 200, json: async () => { throw new SyntaxError('Unexpected token'); } }]);
   await assert.rejects(askJev({}, { apiKey: KEY, fetch: notJson, sleep: fakeSleep() }), /malformed/);

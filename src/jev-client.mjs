@@ -56,7 +56,8 @@ function apiMessage({ json, text }) {
 /**
  * askJev(body, { apiKey, fetch, sleep, timeoutMs, delays }) → { model, answers, usage }.
  * POSTs `body` as JSON. Retries 429, 529, network errors and timeouts once per
- * entry in `delays` (waiting via `sleep`), then throws the last error. Throws a
+ * entry in `delays` (waiting via `sleep`), then throws the last error. A 2xx body
+ * whose `answers` is not an object keyed by question id is malformed. Throws a
  * JevError for everything else; `err.fatal` is true only for a rejected key (401).
  */
 export async function askJev(body, {
@@ -90,7 +91,8 @@ export async function askJev(body, {
     if (!failure) {
       const { status } = res;
       if (res.ok) {
-        if (!Array.isArray(parsed.json?.answers)) throw new JevError('malformed response');
+        const answers = parsed.json?.answers;
+        if (answers == null || typeof answers !== 'object' || Array.isArray(answers)) throw new JevError('malformed response');
         return parsed.json;
       }
       if (status === 401) throw new JevError('TypeSafe rejected the API key (401)', { status, fatal: true });
