@@ -1,6 +1,6 @@
 {
   "name": "qa-tracker",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Evidence-based QA coverage tracking in plain YAML: a feature matrix with a validation ladder, findings, runs and a UI surface checklist — with a CLI built for AI agents and a local dashboard for people.",
   "keywords": [
     "qa",
