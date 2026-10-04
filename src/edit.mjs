@@ -185,7 +185,9 @@ export function applyChange(docs, change, {
         if (typeof change.value !== 'string') return fail('details must be a string');
         const item = findById(docs.issues, change.issue);
         if (!item) return fail(`unknown issue: ${change.issue}`);
-        setField(item, 'details', change.value, docs.issues);
+        // an empty string clears the field rather than storing `details: ''`
+        if (change.value === '') item.delete('details');
+        else setField(item, 'details', change.value, docs.issues);
         return { ok: true, touched: ['issues'] };
       }
       case 'add-feature': return addFeature(docs, change.feature ?? {});

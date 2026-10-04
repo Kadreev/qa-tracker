@@ -203,6 +203,16 @@ test('issue-details sets details without provenance', () => {
   assert.equal(issueOf(d, 'QA-1').triage, undefined);
 });
 
+test('issue-details with an empty string removes the field', () => {
+  const d = docs();
+  assert.equal(applyChange(d, { kind: 'issue-details', issue: 'QA-1', value: 'Tab skips the menu.' }, opts).ok, true);
+  assert.equal(applyChange(d, { kind: 'issue-details', issue: 'QA-1', value: '' }, opts).ok, true);
+  assert.equal('details' in issueOf(d, 'QA-1'), false);
+  assert.doesNotMatch(String(d.issues), /details/);
+  // clearing a field that was never set is not an error
+  assert.equal(applyChange(d, { kind: 'issue-details', issue: 'QA-1', value: '' }, opts).ok, true);
+});
+
 test('add-assessment appends an entry, applies gated values and records applied', () => {
   const d = docs();
   const r = applyChange(d, assess({ 'QA-1': judgments() }), opts);

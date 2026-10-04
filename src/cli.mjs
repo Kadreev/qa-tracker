@@ -51,6 +51,7 @@ Write (each validates the whole dataset first, then regenerates STATUS.md)
   set <issue> status <open|fixed|wont-fix>   (verified-fixed: add-run --verified)
   set <issue> category|complexity|severity|details <value>
                                      an explicit value; confirms or overrides Jev's suggestion
+                                     (details "" clears the details)
   verdict <surface> <pass|broken|blocked|unchecked> --run <run-id> [--issues a,b] [--notes <text>]
   render                             rewrite STATUS.md (and SURFACES.md)
 
@@ -235,7 +236,8 @@ export async function main(argv, io = {}) {
       case 'set': {
         const [id, field, ...rest] = args;
         const value = rest.join(' ');
-        if (!id || !field || !value) return fail('usage: set <id> <field> <value>');
+        // `set <issue> details ""` clears the details; every other field needs a value
+        if (!id || !field || (!value && !(field === 'details' && rest.length))) return fail('usage: set <id> <field> <value>');
         const change = {
           weight: () => ({ kind: 'weight', feature: id, value: Number(value) }),
           target: () => ({ kind: 'target', feature: id, value }),
@@ -253,7 +255,7 @@ export async function main(argv, io = {}) {
         }[field];
         if (field === 'current_level') return fail('current_level only moves through a recorded run: qa-tracker add-run --levels');
         if (!change) return fail(`unknown field: ${field} (weight|target|reverify|${DIMS.join('|')}|status|category|complexity|severity|details)`);
-        return committed(store.commit(change()), () => `${id} ${field} = ${value}`);
+        return committed(store.commit(change()), () => (value === '' ? `${id} ${field} cleared` : `${id} ${field} = ${value}`));
       }
       case 'add-feature': {
         const [id] = args;

@@ -300,6 +300,14 @@ test('set takes category, complexity, severity and details on an issue', async (
   assert.equal(got.complexity, 7);
   assert.equal(got.severity, 'high');
   assert.equal(got.details, 'Tab skips the sort menu on Safari');
+  // an empty string clears details; every other field still needs a value
+  const cleared = await run(cwd, 'set', 'QA-1', 'details', '');
+  assert.equal(cleared.code, 0, cleared.err);
+  assert.match(cleared.out, /QA-1 details cleared/);
+  assert.equal('details' in JSON.parse((await run(cwd, 'get', 'QA-1', '--json')).out), false);
+  assert.doesNotMatch(read(cwd, 'issues.yaml'), /details/);
+  assert.equal((await run(cwd, 'set', 'QA-1', 'severity', '')).code, 1);
+  assert.equal((await run(cwd, 'set', 'QA-1', 'details')).code, 1);
   const bad = await run(cwd, 'set', 'QA-1', 'complexity', '2.5');
   assert.equal(bad.code, 1);
   assert.match(bad.err, /complexity/);
