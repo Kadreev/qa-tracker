@@ -337,3 +337,54 @@
 - [ ] **Step 3:** Add the smoke script; `npm run smoke:jev` with no key prints the skip message and exits 0.
 - [ ] **Step 4:** Run `npm run check` and `npm pack --dry-run` — tests pass, demo validates, package file list unchanged apart from new `src/*.mjs`.
 - [ ] **Step 5: Commit** `docs: triage with Jev — README, agent guide, demo` (CHANGELOG: docs line).
+
+---
+
+### Task 12: Dashboard summary cards and header tooltips
+
+Added 2026-10-04 by a bounded design approved in conversation (not in the spec): summary cards above the coverage matrix, the same numbers as a STATUS.md "Summary" block, and the dashboard legends replaced by tooltips on the table headers.
+
+**Files:**
+- Create: `src/summary.mjs`
+- Modify: `src/dashboard.mjs`, `src/markdown.mjs`, `src/index.mjs`
+- Test: `test/summary.test.mjs`, `test/render.test.mjs`, `test/server.test.mjs`; regenerate `examples/demo/STATUS.md`
+
+**Interfaces:**
+- Consumes: `triageQueue` (Task 3), `nextRunPlan` (`src/plan.mjs`), `LEVELS`, `SEVERITIES` (`src/schema.mjs`), renderers after Tasks 9–10.
+- Produces: `summarize(data, { categories }) → Summary` (pure), exported from `src/index.mjs`:
+  ```
+  Summary = {
+    issues: { total, open, fixed, verified, wontFix,          // fixed = status fixed (awaiting check); verified = verified-fixed
+              fixedPct,                                      // round(100 * (fixed + verified) / (total - wontFix)); null when that denominator is 0
+              openBySeverity: { critical, high, medium, low, unrated },
+              bySeverityStatus: { [critical|high|medium|low|unrated]: { open, fixed, verified, wontFix } } },
+    coverage: { features, atTarget, weightedPct },           // weightedPct = round(100 * Σ w·p / Σ w), p = 1 if idx(target) = 0 else min(idx(cur), idx(target)) / idx(target); null with no features
+    byFeature: [{ feature, name, open: { critical, high, medium, low, unrated }, score }],  // features with ≥1 open issue; score desc, then open count desc, then file order
+    hotspot: { feature, name, score, worst: { id, title, severity } } | null,               // byFeature[0]; worst = its most severe open issue, file order on ties
+    quickWins: number,                                       // open issues with complexity ≤ 3
+    triage: number,                                          // triageQueue(...).length
+    plan: [{ id, name, reason }]                             // first 3 of nextRunPlan
+  }
+  ```
+  Severity weights for `score`: critical 8, high 4, medium 2, low 1, unrated 1 (constant `SEVERITY_WEIGHT`).
+
+**Dashboard layout** (above "Coverage matrix", below the meta line):
+- Row 1, four cards in a responsive grid (`repeat(auto-fit, minmax(200px, 1fr))`): **Open issues** (count + a stacked severity bar with counts; red border when `openBySeverity.critical > 0`), **Fixed** (`fixed + verified` of `total − wontFix` with `fixedPct`, then "N verified · M awaiting check"), **Coverage** (`atTarget / features` at target + a `weightedPct` bar), **Hotspot** (feature name, worst open issue id + severity, score). Empty tracker: each card shows "No issues yet" / "No features yet" instead of zeros.
+- Row 2, three panels: **Issues by feature** (one horizontal stacked bar per `byFeature` row), **Severity × status** (a small table from `bySeverityStatus`), **Work queue** (top 3 of `plan`, `triage` count, `quickWins` count).
+- Plain HTML/CSS only, colours from existing CSS variables (dark and light), prints cleanly; bars are `<div>`s with percentage widths, each with a text count so nothing depends on colour alone.
+
+**Header tooltips replace the on-screen legends:**
+- Every explained header (`W`, `L0`–`L4`, `Func/UX/Code`, and in the issue tables `Severity`, `Category`, `Cx`, `Status`) renders as a focusable trigger with a CSS tooltip: `<th><span class="tip" tabindex="0" aria-describedby="tip-<key>">W</span><span class="tiptext" role="tooltip" id="tip-<key>">…</span></th>`; shown on `:hover` and `:focus-within`, text taken from the existing legend lines (and the §8.1 issue legend).
+- The on-screen `.legend` blocks are removed. For PDF export a `.legend-print` block (hidden on screen, shown in `@media print`) with the same text follows each table, since tooltips don't print.
+- STATUS.md keeps its text legend (no tooltips in Markdown).
+
+**STATUS.md:** a `## Summary` section directly after the "Last run" line: bullets for open issues by severity, fixed (verified / awaiting check / fixedPct), coverage (atTarget, weightedPct), hotspot, quick wins, triage queue size. Deterministic.
+
+- [ ] **Step 1: Write the failing tests:**
+  - `test/summary.test.mjs` — `counts and percentages` (fixture: 5 issues: open critical, open low, open unrated, fixed medium, verified-fixed high, plus one wont-fix → `open 3`, `fixed 1`, `verified 1`, `wontFix 1`, `fixedPct 40`); `weighted coverage` (features w4 L3/L4 and w2 L2/L2 → `weightedPct` = round(100·(4·0.75+2·1)/6) = 83, `atTarget 1`); `hotspot prefers one critical over three lows` (feature A: 1 critical = 8; feature B: 3 low = 3 → hotspot A, worst = the critical); `ties break by open count then file order`; `quick wins and triage count`; `empty tracker` (`fixedPct null`, `weightedPct null`, `hotspot null`, `byFeature []`).
+  - `test/render.test.mjs` — `STATUS.md has a Summary block after the last-run line` with the open/fixed/coverage numbers of the fixture.
+  - `test/server.test.mjs` — `the page has summary cards and header tooltips`: GET `/` contains `class="cards"`, `Hotspot`, `role="tooltip"`, `aria-describedby="tip-W"`, and no element with class `legend` outside `legend-print`.
+- [ ] **Step 2: Run** `node --test test/summary.test.mjs test/render.test.mjs test/server.test.mjs` — expect FAIL.
+- [ ] **Step 3: Implement** `src/summary.mjs`, the cards/panels and tooltips in `src/dashboard.mjs`, the Summary block in `src/markdown.mjs`; run `npm run demo:render`.
+- [ ] **Step 4: Run** `node --test` — all pass. Check the page in the Browser pane (`demo-dashboard` launch config): cards in dark and light, tooltips on hover and keyboard focus, phone width (no horizontal page scroll; the grid wraps), and print preview shows the print legends.
+- [ ] **Step 5: Commit** `feat: dashboard summary cards and header tooltips` (CHANGELOG: summary cards, STATUS.md Summary, legends as header tooltips).
