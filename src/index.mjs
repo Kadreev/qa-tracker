@@ -5,7 +5,7 @@ export { createStore, YAML_OUT } from './store.mjs';
 export { validate, validateAll, isLogWarning } from './validate.mjs';
 export { resolveCategories, DEFAULT_CATEGORIES } from './categories.mjs';
 export { assessmentIndex, judgmentOf, latestFor } from './assessments.mjs';
-export { applyChange, CHANGE_KINDS, nextId, nextRunId } from './edit.mjs';
+export { applyChange, CHANGE_KINDS, nextId, nextRunId, nextAssessmentId } from './edit.mjs';
 export { nextRunPlan } from './plan.mjs';
 export { renderMarkdown } from './markdown.mjs';
 export { renderContent } from './dashboard.mjs';

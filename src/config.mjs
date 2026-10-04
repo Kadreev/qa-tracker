@@ -18,6 +18,7 @@ export function filesIn(dir) {
     features: path.join(dir, 'features.yaml'),
     issues: path.join(dir, 'issues.yaml'),
     runs: path.join(dir, 'runs.yaml'),
+    assessments: path.join(dir, 'assessments.yaml'),
     status: path.join(dir, 'STATUS.md'),
     surfaces: path.join(dir, 'SURFACES.md'),
     surfacesDir: path.join(dir, 'surfaces'),

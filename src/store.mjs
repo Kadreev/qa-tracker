@@ -14,7 +14,7 @@ import { SURFACE_VERDICTS } from './schema.mjs';
 
 /** The tools write with lineWidth 0 so a one-field edit is a one-line diff. */
 export const YAML_OUT = { lineWidth: 0 };
-const ENTITIES = ['features', 'issues', 'runs'];
+const ENTITIES = ['features', 'issues', 'runs', 'assessments'];
 
 const readText = file => (existsSync(file) ? readFileSync(file, 'utf8') : '');
 
@@ -55,11 +55,15 @@ export function createStore(cfg) {
     else rmSync(files.surfaces, { force: true }); // generated; stale once the last surfaces file is gone
   }
 
-  /** Apply one change, validate the would-be dataset, then write. → { ok, id? } | { ok:false, error } */
+  /**
+   * Apply one change, validate the would-be dataset, then write only the files
+   * it changed (a missing assessments.yaml stays missing unless the change adds one).
+   * → { ok, id?, …extra results such as applied/dropped } | { ok:false, error }
+   */
   function commit(change, opts) {
     const docs = readDocs();
     const before = Object.fromEntries(ENTITIES.map(k => [k, docs[k].toString(YAML_OUT)]));
-    const applied = applyChange(docs, change, opts);
+    const applied = applyChange(docs, change, { ...opts, categories: cfg.categories });
     if (!applied.ok) return applied;
 
     const next = {
@@ -74,7 +78,8 @@ export function createStore(cfg) {
       if (out !== before[k]) writeAtomic(files[k], out);
     }
     writeStatus(next);
-    return { ok: true, id: applied.id };
+    const { touched, ...result } = applied; // touched is internal; applied/dropped etc. are for the caller
+    return { ok: true, id: applied.id, ...result };
   }
 
   /**
