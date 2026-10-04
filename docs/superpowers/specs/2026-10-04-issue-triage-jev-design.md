@@ -80,14 +80,18 @@ The three **triage fields** are `category`, `complexity` and `severity`.
 | `complexity` | integer 1–10 | no | Fix effort (§2.3). |
 | `triage` | map | no | Keys ⊆ {`category`, `complexity`, `severity`}; see 2.2. |
 
-`type` stays required. When `category` is in the list and is not `other`,
-`type` must equal that category's type. `other` never changes `type`.
+`type` stays required and is **derived**: it carries no provenance and is not a
+triage field. Whenever a category that is in the list and is not `other` is
+written (by Jev or by `set`), `type` is set to that category's type,
+replacing whatever `type` was there. `--type` / a hand-set `type` is honoured
+only while the category is absent or `other`. `other` never changes `type`.
 
 ### 2.2 Provenance: `triage`
 
 | Entry | Meaning | Jev may overwrite? |
 |---|---|---|
-| `{ source: jev, assessment: <id> }` | Value was applied from that assessment | Yes, by a later assessment that passes the gate |
+| `{ source: jev, assessment: <id> }`, value equals what `<id>` said | Value was applied from that assessment | Yes, by a later assessment that passes the gate |
+| `{ source: jev, … }`, value differs from what `<id>` said, or `<id>` missing | Someone edited a Jev value by hand | No — treated as explicit with no `seen` |
 | `{ source: set, seen: <id> }` | Value was set on purpose after assessment `<id>` existed | No |
 | `{ source: set }` | Value was set on purpose before any assessment of this issue | No |
 | no entry, value present | Legacy or hand-edited value; treated as `set` with nothing seen | No |
@@ -98,7 +102,8 @@ The three **triage fields** are `category`, `complexity` and `severity`.
   when the value is unchanged. That is how an agent **confirms** a value and
   clears a disagreement.
 - An assessment is "newer than `seen`" when it appears later in
-  `assessments.yaml` (file order is the log's order).
+  `assessments.yaml` (file order is the log's order). A `seen` naming an
+  assessment that does not exist is treated as no `seen`.
 
 ### 2.3 Categories
 
@@ -132,6 +137,8 @@ preserved and `other` is appended:
   }
 }
 ```
+
+The only other `jev` config key is the boolean `auto_assess` (§4.2).
 
 Config rules, enforced by `resolveConfig` (throws, like invalid JSON today):
 names kebab-case; each entry has `type` ∈ `code|functionality|usability` and a
@@ -189,11 +196,14 @@ Used verbatim as the Jev Score criteria (low → high) and in docs/SCHEMA.md.
 |---|---|---|
 | category | `confidence ≥ 0.70`, value ≠ `other`, value in the list in effect | `CATEGORY_MIN = 0.70` |
 | complexity | `top ≥ 0.50` | `COMPLEXITY_MIN_TOP = 0.50` |
-| severity | `confidence ≥ 0.70` | `SEVERITY_MIN = 0.70` |
+| severity | `confidence ≥ 0.85` | `SEVERITY_MIN = 0.85` |
 
 These are starting values (within TypeSafe's guidance of >0.9 act, 0.5–0.9
-confirm, <0.5 escalate), to be tuned on real data. Full probabilities are
-stored so re-evaluating needs no new requests.
+confirm, <0.5 escalate), to be tuned on real data. Severity starts stricter
+because it drives sort order and nothing checks it later. Confidence measures
+how peaked the distribution is: for a 4-option Choice, 0.70 corresponds to a
+top probability of roughly 0.78, and for 12 categories roughly 0.72. Full
+probabilities are stored so re-evaluating needs no new requests.
 
 ### 3.2 Apply rule (inside `applyChange('add-assessment')`)
 
@@ -201,14 +211,17 @@ Evaluated against the documents being written, not a pre-request snapshot. For
 each assessed issue that still exists and each triage field:
 
 1. **Writable?** The field is writable when its value is absent, or its
-   `triage` entry has `source: jev`. Otherwise (explicit value) skip.
+   `triage` entry has `source: jev` **and** the value still equals what that
+   entry's assessment said. Otherwise (explicit value, including a hand-edited
+   Jev value) skip.
 2. **Gate passes?** If writable and the gate passes: set the value (category
    also sets `type`), set `triage.<field> = { source: jev, assessment: <id> }`,
    add the field to `applied`.
 3. If writable and the gate fails: leave the field as it is (an earlier Jev
    value stays; a gap stays a gap).
 
-Issues named in the assessment that no longer exist are skipped silently.
+Issues that no longer exist when the commit is applied are dropped from the
+entry before it is written (and reported as failed in the command output).
 
 ### 3.3 Triage queue (computed at render time)
 
@@ -216,8 +229,11 @@ For each issue with status `open`, each triage field yields at most one item:
 
 | Item | Condition |
 |---|---|
-| `needs-triage` | Value absent, or category not in the list in effect. Reason from the latest assessment of the issue: `low confidence (0.42)`, `category other`, `category not in list`, or `not assessed`. |
-| `disagrees` | Value is explicit (§2.2), the latest assessment of the issue is newer than its `seen` (or there is no `seen`), and that assessment differs with the field's gate passing — for complexity, only when the levels differ by 2 or more. |
+| `needs-triage` | Value absent, or category not in the list in effect. Reason from the latest assessment of the issue: `low confidence (42%)`, `category other`, `category not in list`, or `not assessed`. |
+| `disagrees` | Value is explicit (§2.2); the latest assessment of the issue is newer than its `seen` (or there is no `seen`); that assessment's suggestion differs from the current value with the field's gate passing (for complexity, only when the levels differ by 2 or more); **and** that suggestion differs from what the `seen` assessment suggested for the field (so re-assessing an already-confirmed issue with the same answer does not resurrect the item). |
+
+When both conditions hold for one field, `needs-triage` wins: one item per
+field.
 
 The queue is sorted by issue file order, then field (`severity`, `category`,
 `complexity`). Agents resolve items with `set` (§4.3), which records
@@ -228,7 +244,8 @@ The queue is sorted by issue file order, then field (`severity`, `category`,
 ### 4.1 `qa-tracker assess`
 
 ```
-qa-tracker assess                 # open issues with a needs-triage field or a source: jev field
+qa-tracker assess                 # open issues with a needs-triage field
+qa-tracker assess --refresh       # also open issues with source: jev fields (lets Jev revise its own values)
 qa-tracker assess QA-3 QA-7       # these issues
 qa-tracker assess --all           # every issue, any status
 qa-tracker assess --dry-run       # print the exact request bodies; no network, no key needed
@@ -250,20 +267,26 @@ qa-tracker assess --json          # machine-readable result (shape below)
   `null | "needs-triage" | "disagrees"`.
 - Exit 0 when all succeeded; 1 when any failed (successes are still written).
   No issues selected → "nothing to assess", exit 0.
+- `assessments.yaml` grows by one entry per run; there is no compaction.
 
 ### 4.2 `qa-tracker add-issue` (auto-assess)
 
 ```
 qa-tracker add-issue --feature notes-list --title "…" [--details "…"] \
-          [--severity low] [--category accessibility] [--complexity 2] [--type …] [--no-assess]
+          [--severity low] [--category accessibility] [--complexity 2] [--type …] [--assess | --no-assess]
 ```
 
 - `--severity` is now optional.
 - Given triage flags are explicit values (`triage.<field> = { source: set }`).
-- After the issue is saved, when `TYPESAFE_API_KEY` is set and `--no-assess` is
-  absent, it runs `assess <new-id>` as a second commit. If that fails, the issue
-  stays saved, a warning is printed, exit code is 0, and the issue remains in
-  the triage queue.
+- **Auto-assess is opt-in per project:** `"jev": { "auto_assess": true }` in
+  `qa-tracker.config.json` (default `false`). `--assess` / `--no-assess`
+  override it for one call. Having `TYPESAFE_API_KEY` in the environment alone
+  never sends anything.
+- When auto-assess applies, after the issue is saved it prints
+  `sending QA-9 to TypeSafe (api.typesafe.ai)…` and runs `assess <new-id>` as a
+  second commit. If that fails (including a missing key), the issue stays
+  saved, a warning is printed, exit code is 0, and the issue remains in the
+  triage queue.
 - `--type` with a non-`other` `--category` must agree; with `--category other`
   or no category, `type` comes from `--type` (default `functionality`).
 
@@ -285,6 +308,8 @@ QA-3> }` (omit `seen` when none), even if the value is unchanged.
 qa-tracker triage            # the queue, one line per item
 qa-tracker triage --json     # [{ issue, field, kind, current, suggested, confidence, reason }]
 ```
+
+`suggested` and `confidence` are `null` when the reason is `not assessed`.
 
 Exit 0 always (an empty queue prints "Triage queue empty."). `get <issue>`
 also prints `triage` provenance and the latest assessment's answers.
@@ -336,8 +361,15 @@ option keys of `category.probabilities`.
 
 ## 6. Validation
 
-`validate` returns **errors** (block writes, non-zero exit) and, new,
-**warnings** (printed by `validate` and listed in STATUS.md; exit 0).
+**API.** `validate(data, opts) → string[]` is unchanged and returns errors
+only, so existing callers and `store.commit` keep gating on errors. New
+`validateAll(data, opts) → { errors, warnings }` (exported from
+`src/index.mjs`); `store.validate()` keeps returning errors and new
+`store.check()` returns `{ errors, warnings }`. `qa-tracker validate` prints
+errors to stderr and warnings as `warning: …` lines to stdout, and exits 1 only
+when there are errors.
+
+Errors block writes; warnings never do.
 
 Errors:
 1. `severity`, when present, is a known severity.
@@ -359,7 +391,12 @@ Warnings:
 2. An assessment names an issue id that does not exist.
 3. A `triage` entry references an assessment id that does not exist, or one
    that does not contain the issue.
-4. A `source: jev` value differs from what its assessment said (hand-edited).
+4. A `source: jev` value differs from what its assessment said (hand-edited;
+   §2.2 treats it as explicit).
+
+Warnings 1 and 4 are about issues and are listed in STATUS.md. Warnings 2 and
+3 are about the append-only log, cannot be cleared by editing it, and are
+printed only by `validate` and `get`.
 
 Config problems are caught earlier by `resolveConfig` (§2.3).
 
@@ -384,7 +421,10 @@ network and no real delays.
 Columns: `ID | Severity | Category | Cx | Feature | Title | Status` (`—` when
 unset). A value whose `triage` source is `jev` is marked `ᴶ` in STATUS.md and
 with a "Jev 91%" tooltip in the dashboard. Open issues sort by severity
-(unset last), then complexity ascending (unset last), then file order. Legend:
+(unset last), then complexity ascending (unset last), then file order. Closed
+issues keep today's order (status, then severity) with unset severity last. An
+unset severity renders with class `sev none`. Percentages are shown as whole
+percent everywhere (`Math.round(x * 100)`). Legend:
 
 > **Severity** = impact on users (critical → low) · **Complexity** = effort to
 > fix, 1–10 · **Status** = lifecycle (open → fixed → verified-fixed, or
@@ -393,8 +433,9 @@ with a "Jev 91%" tooltip in the dashboard. Open issues sort by severity
 ### 8.2 STATUS.md "Triage queue" and warnings
 
 The §3.3 queue as a table (issue, field, kind, current, suggested, confidence,
-reason); empty → "_Triage queue empty._". Validation warnings, when any, are
-listed under it. Deterministic.
+reason); empty → "_Triage queue empty._". Issue warnings (§6 warnings 1 and 4)
+are listed under it. Deterministic: depends only on the files and code
+constants; `status` (stdout) and `STATUS.md` are rendered from the same input.
 
 ### 8.3 Dashboard
 
@@ -446,8 +487,13 @@ No new runtime dependency (Node ≥ 20 global `fetch`). `main()` accepts
 - **Schema docs:** every category, complexity level and new field appears in
   docs/SCHEMA.md.
 - **Demo:** demo issues gain categories and complexity (mixed `jev` and `set`
-  sources) and one example assessment with `model: jev-example`; demo
-  STATUS.md regenerated.
+  sources) and one example assessment with `model: jev-example` and realistic
+  probabilities, so the queue shows at least one `needs-triage` and one
+  `disagrees` item; demo STATUS.md regenerated.
+- **Policy additions:** a hand-edited `source: jev` value is not overwritten;
+  `type` follows a written category; re-assessing a confirmed issue with the
+  same suggestion does not resurrect `disagrees`; `needs-triage` wins over
+  `disagrees`; auto-assess only with `jev.auto_assess` or `--assess`.
 - **Live smoke (not in CI):** `npm run smoke:jev` assesses one demo issue when
   `TYPESAFE_API_KEY` is set and prints the result without writing.
 - No test or CI job contacts the real API.
@@ -461,5 +507,8 @@ No new runtime dependency (Node ≥ 20 global `fetch`). `main()` accepts
 - docs/SCHEMA.md: new fields, `triage`, category and complexity tables,
   `assessments.yaml`, errors and warnings.
 - templates/AGENTS.md and the skill: log findings with `add-issue --details`,
-  run `triage` and resolve items with `set`.
+  run `triage` and resolve items with `set`; `--severity` is no longer required
+  (update `templates/AGENTS.md`, `skills/qa-tracker/SKILL.md`,
+  `templates/issues.yaml`, and `ISSUE_FIELDS.severity.required` in
+  `src/schema.mjs`).
 - CHANGELOG `[Unreleased]` entries as features land; release as 0.3.0.
