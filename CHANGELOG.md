@@ -44,6 +44,12 @@ All notable changes to this project are documented here. The format follows
 - The dashboard shows the Category and Cx columns (Jev-set values carry the ᴶ mark and a
   "Jev 91%" tooltip), a "Triage queue" section, and edit-mode selects for category,
   complexity and severity that record explicit values like `set`.
+- Docs: a "Triage with Jev" section in the README (fields, the autonomous flow,
+  the triage queue, exactly what is sent to TypeSafe, key setup, opt-in
+  auto-assess), the agent guide and skill without `--severity` as required, the
+  Acme Notes demo with categories, complexity and an illustrative
+  `assessments.yaml`, and `npm run smoke:jev`, a live check (needs
+  `TYPESAFE_API_KEY`, writes nothing, not part of CI).
 
 ### Changed
 - The `Type` column is gone from the `STATUS.md` issue tables; the category

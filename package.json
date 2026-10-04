@@ -46,7 +46,8 @@
     "test": "node --test",
     "check": "node --test && node bin/qa-tracker.mjs validate --dir examples/demo",
     "demo": "node bin/qa-tracker.mjs serve --dir examples/demo",
-    "demo:render": "node bin/qa-tracker.mjs render --dir examples/demo"
+    "demo:render": "node bin/qa-tracker.mjs render --dir examples/demo",
+    "smoke:jev": "node scripts/smoke-jev.mjs"
   },
   "dependencies": {
     "yaml": "^2.9.0"

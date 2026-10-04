@@ -23,25 +23,21 @@ _Last run: run-2026-01-20 (2026-01-20, sandbox) · 6 features · 3 open issues �
 ## Open issues (by severity)
 | ID | Severity | Category | Cx | Feature | Title | Status |
 |---|---|---|---|---|---|---|
-| QA-4 | critical | — | — | note-editor | Autosave drops the last 2 seconds of typing when the tab is closed | open |
-| QA-5 | medium | — | — | search | No-results state says "Error" instead of explaining there were no matches | open |
-| QA-3 | low | — | — | notes-list | Sort menu has no keyboard focus ring | open |
+| QA-4 | criticalᴶ | error-handlingᴶ | 3 | note-editor | Autosave drops the last 2 seconds of typing when the tab is closed | open |
+| QA-5 | medium | contentᴶ | 1ᴶ | search | No-results state says "Error" instead of explaining there were no matches | open |
+| QA-3 | low | accessibilityᴶ | — | notes-list | Sort menu has no keyboard focus ring | open |
 
 ## Closed issues
 | ID | Severity | Category | Cx | Feature | Title | Status |
 |---|---|---|---|---|---|---|
-| QA-2 | high | — | — | notes-list | Deleting a pinned note leaves an empty card until reload | fixed |
-| QA-1 | medium | — | — | sign-in | Sign-up form accepts an e-mail with a trailing space and then cannot sign in | verified-fixed |
+| QA-2 | high | functional | 4ᴶ | notes-list | Deleting a pinned note leaves an empty card until reload | fixed |
+| QA-1 | medium | functionalᴶ | 2ᴶ | sign-in | Sign-up form accepts an e-mail with a trailing space and then cannot sign in | verified-fixed |
 
 ## Triage queue
 | Issue | Field | Kind | Current | Suggested | Confidence | Reason |
 |---|---|---|---|---|---|---|
-| QA-3 | category | needs-triage | — | — | — | not assessed |
-| QA-3 | complexity | needs-triage | — | — | — | not assessed |
-| QA-4 | category | needs-triage | — | — | — | not assessed |
-| QA-4 | complexity | needs-triage | — | — | — | not assessed |
-| QA-5 | category | needs-triage | — | — | — | not assessed |
-| QA-5 | complexity | needs-triage | — | — | — | not assessed |
+| QA-3 | complexity | needs-triage | — | 3 | 30% | low confidence (30%) |
+| QA-4 | complexity | disagrees | 3 | 6 | 58% | Jev suggests 6 (58%) |
 
 ## UI surfaces (see `SURFACES.md` for the nested checklist)
 _7 surfaces · ✅ 3 · ❌ 1 · ⛔ 1 · ⬜ 2 never checked._
