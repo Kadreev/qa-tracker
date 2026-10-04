@@ -149,6 +149,23 @@ test('queue: needs-triage reasons', () => {
   ]);
 });
 
+test('queue: a gap with an above-gate answer says not applied, never low confidence', () => {
+  // A Jev-applied value deleted afterwards.
+  const deleted = { id: 'QA-1', status: 'open', type: 'code', category: 'data', complexity: 2,
+    triage: { severity: { source: 'jev', assessment: 'asm-2026-10-04' } } };
+  const assessments = [asm('asm-2026-10-04', { 'QA-1': { severity: sev('high', 0.9) } })];
+  assert.deepEqual(triageQueue({ issues: [deleted], assessments }, categories), [{
+    issue: 'QA-1', field: 'severity', kind: 'needs-triage', current: null, suggested: 'high', confidence: 0.9, reason: 'not applied (re-run assess)',
+  }]);
+  // A category added to the list after the assessment named it.
+  const gap = { id: 'QA-2', status: 'open', type: 'code', severity: 'low', complexity: 2 };
+  const named = [asm('asm-2026-10-04', { 'QA-2': { category: cat('checkout', 0.95) } })];
+  const widened = resolveCategories({ checkout: { type: 'functionality', description: 'Cart and payment fail.' } });
+  assert.deepEqual(triageQueue({ issues: [gap], assessments: named }, widened), [{
+    issue: 'QA-2', field: 'category', kind: 'needs-triage', current: null, suggested: 'checkout', confidence: 0.95, reason: 'not applied (re-run assess)',
+  }]);
+});
+
 test('queue: disagrees and how set clears it', () => {
   const base = { id: 'QA-1', status: 'open', type: 'code', category: 'data', complexity: 2, severity: 'low' };
   const first = asm('asm-2026-10-01', { 'QA-1': { severity: sev('medium', 0.9) } });

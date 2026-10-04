@@ -117,6 +117,8 @@ const suggestion = (field, judgment) => (judgment
 
 function gapReason(field, judgment, categories) {
   if (!judgment) return 'not assessed';
+  // Above the gate yet still a gap: the value was deleted, or the category listed later.
+  if (gatePasses(field, judgment, categories)) return 'not applied (re-run assess)';
   if (field === 'category' && judgment.value === OTHER.name) return 'category other';
   if (field === 'category' && !categoryByName(categories, judgment.value)) return 'category not in list';
   return `low confidence (${pct(gateConfidence(field, judgment))})`;
