@@ -13,6 +13,9 @@ import { pct } from './format.mjs';
 
 /** Requests in flight at once. */
 export const CONCURRENCY = 4;
+
+/** A map keyed by issue id: no prototype, so any id (even `__proto__`) is a plain key. */
+const idMap = () => Object.create(null);
 /** Fields in the order the assess output shows them. */
 const SHOWN_FIELDS = ['category', 'complexity', 'severity'];
 
@@ -63,8 +66,10 @@ async function pool(items, limit, task) {
  * { model, judgments: { [id]: judgments }, failed: { [id]: reason }, usage }.
  * `ask(body)` returns the API response. A failed request or an unusable answer
  * fails that issue only; a fatal error (JevError 401) rejects the whole run.
- * Keys follow `issues` order; `model` is the first answering response's; usage
- * is summed over every response received.
+ * Keys follow `issues` order; `model` is the first answering response's, and a
+ * response naming a different model fails its issue (one entry has one model);
+ * usage is summed over every response received. The id-keyed maps have no
+ * prototype, so an issue id like `__proto__` is an ordinary key.
  */
 export async function runAssess({ data, issues, title, categories, ask, concurrency = CONCURRENCY }) {
   const results = new Map();
@@ -81,7 +86,7 @@ export async function runAssess({ data, issues, title, categories, ask, concurre
     }
   });
 
-  const out = { model: null, judgments: {}, failed: {}, usage: { input_tokens: 0, output_tokens: 0 } };
+  const out = { model: null, judgments: idMap(), failed: idMap(), usage: { input_tokens: 0, output_tokens: 0 } };
   for (const { id } of issues) {
     const r = results.get(id);
     if (!r) continue;
@@ -89,6 +94,7 @@ export async function runAssess({ data, issues, title, categories, ask, concurre
       if (Number.isFinite(r.usage?.[k])) out.usage[k] += r.usage[k];
     if (r.error !== undefined) { out.failed[id] = r.error; continue; }
     out.model ??= r.model;
+    if (r.model !== out.model) { out.failed[id] = `answered by ${r.model}, not ${out.model}; re-run assess for this issue`; continue; }
     out.judgments[id] = r.judgments;
   }
   return out;
@@ -125,7 +131,7 @@ export async function assessAndCommit({ store, ids, all, refresh, apiKey, fetch,
 
 /** emptyAssessResult() → the assessAndCommit result of a run that asked about nothing. */
 export function emptyAssessResult() {
-  return { id: null, model: null, judgments: {}, applied: {}, failed: {}, usage: { input_tokens: 0, output_tokens: 0 }, selected: [] };
+  return { id: null, model: null, judgments: idMap(), applied: idMap(), failed: idMap(), usage: { input_tokens: 0, output_tokens: 0 }, selected: [] };
 }
 
 /** The number shown for a judgment: `top` for complexity, `confidence` otherwise. */
@@ -182,7 +188,7 @@ const reportOrder = result => [...new Set([...(result.selected ?? []), ...Object
  */
 export function assessJson(result, data, categories) {
   const ctx = contextFor(result, data, categories);
-  const issues = {}, failed = {};
+  const issues = idMap(), failed = idMap();
   for (const id of reportOrder(result)) {
     if (result.judgments[id]) issues[id] = assessFields(result.judgments[id], ctx(id));
     else if (id in result.failed) failed[id] = result.failed[id];

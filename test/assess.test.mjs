@@ -268,7 +268,7 @@ test('runAssess keeps at most 4 requests in flight and reports in file order', a
   assert.equal(most, 4);
   assert.equal(res.model, 'jev-1.13.0');
   assert.deepEqual(Object.keys(res.judgments), ['QA-1', 'QA-2', 'QA-4', 'QA-5', 'QA-6', 'QA-7', 'QA-8', 'QA-9', 'QA-10']);
-  assert.deepEqual(res.failed, { 'QA-3': 'TypeSafe returned 500' });
+  assert.deepEqual({ ...res.failed }, { 'QA-3': 'TypeSafe returned 500' });
   assert.deepEqual(res.usage, { input_tokens: 900, output_tokens: 63 });
   assert.equal(res.judgments['QA-1'].complexity.value, 4);
 
@@ -286,4 +286,45 @@ test('formatAssessLine: kept values name their source; empty fields show only th
   const queue = [{ issue: 'QA-7', field: 'category', kind: 'needs-triage' }, { issue: 'QA-8', field: 'severity', kind: 'disagrees' }];
   assert.equal(formatAssessLine('QA-7', judgments, { issue: current, applied: ['severity'], queue }),
     'QA-7  category content 42% ⚠needs-triage · complexity 3 (66%) (kept: 3, jev) · severity high 86% ✓applied');
+});
+
+test('an out-of-range confidence fails that issue only; the rest still commit', async () => {
+  const cwd = await tracker();
+  const bad = ok({ category: 'performance', catConf: 1.2, level: 5, top: 0.6, severity: 'medium', sevConf: 0.9 });
+  const fetch = fakeFetch({ 'Huge paste freezes editor': bad });
+  const r = await run(cwd, { fetch }, 'assess', '--json');
+  assert.equal(r.code, 1);
+  const out = JSON.parse(r.out);
+  assert.match(out.failed['QA-4'], /category: confidence must be between 0 and 1/);
+  assert.ok(out.issues['QA-1'], 'QA-1 is still committed');
+  assert.match(read(cwd, 'assessments.yaml'), /QA-1:/);
+  assert.equal((await run(cwd, {}, 'validate')).code, 0);
+});
+
+test('responses naming a different model than the first fail instead of being mislabelled', async () => {
+  const other = ok({ category: 'performance', catConf: 0.88, level: 5, top: 0.6, severity: 'medium', sevConf: 0.9 });
+  other.body.model = 'jev-1.14.0';
+  const issues = [{ id: 'QA-1', title: 'Sort menu has no focus ring' }, { id: 'QA-4', title: 'Huge paste freezes editor' }];
+  const ask = async body => (body.state.issue.title === 'Huge paste freezes editor' ? other : REPLIES[body.state.issue.title]).body;
+  const res = await runAssess({ data: { features: [], surfaces: [] }, issues, title: 'Acme', categories, ask });
+  assert.equal(res.model, 'jev-1.13.0');
+  assert.deepEqual(Object.keys(res.judgments), ['QA-1']);
+  assert.match(res.failed['QA-4'], /answered by jev-1\.14\.0, not jev-1\.13\.0/);
+});
+
+test('an issue id of __proto__ is assessed and committed like any other', async () => {
+  const cwd = await tracker(`- id: __proto__
+  title: Sort menu has no focus ring
+  severity: low
+  type: usability
+  feature: notes
+  status: open
+`);
+  const r = await run(cwd, { fetch: fakeFetch() }, 'assess', '--json');
+  assert.equal(r.code, 0, r.err);
+  const out = JSON.parse(r.out);
+  assert.ok(Object.hasOwn(out.issues, '__proto__'));
+  assert.match(read(cwd, 'assessments.yaml'), /__proto__:/);
+  assert.match(read(cwd, 'issues.yaml'), /category: accessibility/);
+  assert.equal((await run(cwd, {}, 'validate')).code, 0);
 });

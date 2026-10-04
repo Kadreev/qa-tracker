@@ -26,6 +26,8 @@ function answerOf(answers, field, type) {
   if (!isMapping(answer)) throw new Error(`${field}: no answer`);
   if (answer.type !== type) throw new Error(`${field}: expected a ${type} answer, got ${answer.type ?? 'none'}`);
   if (typeof answer.confidence !== 'number') throw new Error(`${field}: confidence must be a number`);
+  // Checked here, per issue: an out-of-range value caught only by validate would sink the whole batch.
+  if (!(answer.confidence >= 0 && answer.confidence <= 1)) throw new Error(`${field}: confidence must be between 0 and 1, got ${answer.confidence}`);
   if (!isMapping(answer.probabilities)) throw new Error(`${field}: probabilities must be an object`);
   return answer;
 }

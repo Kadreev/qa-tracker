@@ -23,7 +23,9 @@ All notable changes to this project are documented here. The format follows
   name, area and routes, and the surfaces that list it are sent; recorded labels
   never are. The key is read from `TYPESAFE_API_KEY` and is never written or
   printed; `--dry-run` prints the exact request bodies (one JSON array) with no key
-  and no network.
+  and no network. A response with a confidence outside 0–1, or naming a
+  different model than the run's first answer, fails only that issue; the rest
+  of the run is still recorded.
 - `qa-tracker triage [--json]` lists the issues that still need a person: a
   missing category, complexity or severity, and Jev answers that disagree with
   an explicit value. `get <issue>` shows where each value came from, the latest

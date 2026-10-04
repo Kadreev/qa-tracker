@@ -347,7 +347,7 @@ function addAssessment(docs, a, today, categories) {
   const entry = { id, date, model: a.model, rubric: a.rubric, issues: Object.fromEntries(kept.map(iid => [iid, { ...a.issues[iid] }])) };
   // Include the new entry so a jev entry naming it is judged against what it says.
   const assessments = [...assessmentsOf(docs), entry];
-  const applied = {};
+  const appliedPairs = []; // Object.fromEntries below: an id like `__proto__` stays an own key
   for (const iid of kept) {
     const item = findById(docs.issues, iid);
     const plan = planApply(item.toJS(docs.issues), a.issues[iid], { assessmentId: id, assessments, categories });
@@ -355,7 +355,7 @@ function addAssessment(docs, a, today, categories) {
     if (plan.type) setField(item, 'type', plan.type, docs.issues);
     for (const [field, provenance] of Object.entries(plan.triage)) setProvenance(item, field, provenance, docs.issues);
     entry.issues[iid].applied = plan.applied;
-    applied[iid] = plan.applied;
+    appliedPairs.push([iid, plan.applied]);
   }
 
   const doc = docs.assessments;
@@ -365,5 +365,5 @@ function addAssessment(docs, a, today, categories) {
   for (const { value: issue } of node.get('issues').items)
     for (const { value } of issue.items) value.flow = true;
   seqOf(doc).add(node);
-  return { ok: true, id, touched: ['assessments', 'issues'], applied, dropped };
+  return { ok: true, id, touched: ['assessments', 'issues'], applied: Object.fromEntries(appliedPairs), dropped };
 }
