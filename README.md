@@ -166,9 +166,10 @@ Fail the build when the tracker is invalid or `STATUS.md` is stale:
 
 `qa-tracker serve` serves the matrix, open and closed issues, the surface
 roll-up and the next-run plan. In **Edit mode** you can change weights, toggle
-re-verify and re-status issues. Each edit is validated and written straight back
-to the YAML, keeping comments and formatting. **Export PDF** uses the browser's
-print dialog.
+re-verify, re-status issues and set an issue's category, complexity and
+severity. A "Triage queue" lists what still needs a person. Each edit is
+validated and written straight back to the YAML, keeping comments and
+formatting. **Export PDF** uses the browser's print dialog.
 
 The server binds to `127.0.0.1` and only accepts same-origin JSON requests with a
 loopback `Host`, so a web page you visit can't write to your tracker.

@@ -1,11 +1,14 @@
 // HTML rendering for the local dashboard (src/server.mjs): the stylesheet and the
-// data content (matrix, issues, surfaces roll-up, next-run plan). No script here;
+// data content (matrix, issues, triage queue, surfaces roll-up, next-run plan). No script here;
 // the server adds the toolbar and the edit wiring.
 import { LEVELS, DIMS, ISSUE_STATUS } from './schema.mjs';
 import { nextRunPlan } from './plan.mjs';
 import { flattenSurfaces, surfaceStats } from './surfaces.mjs';
 import { DEFAULT_TITLE } from './config.mjs';
-import { DIM_ICON, SEV_ORDER, STATUS_ORDER } from './format.mjs';
+import { DIM_ICON, SEV_ORDER, pct, openOrder, closedOrder } from './format.mjs';
+import { resolveCategories } from './categories.mjs';
+import { triageQueue } from './triage-policy.mjs';
+import { judgmentOf } from './assessments.mjs';
 
 const idx = l => LEVELS.indexOf(l);
 export const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -28,7 +31,7 @@ export const STYLE = `
   .legend { color: var(--muted); font-size: 12px; border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin: 8px 0 4px; display: grid; gap: 3px; }
   .legend b { color: var(--fg); font-weight: 600; }
   .legend .dot-pass { color: var(--pass); } .legend .dot-tgt { color: var(--tgt); }
-  .sev.critical, .sev.high { color: var(--bad); font-weight: 600; } .sev.medium { color: var(--warn); } .sev.low { color: var(--muted); }
+  .sev.critical, .sev.high { color: var(--bad); font-weight: 600; } .sev.medium { color: var(--warn); } .sev.low, .sev.none { color: var(--muted); }
   .closed-issues tbody { color: var(--muted); }
   .edit-only { display: none; }
   .editing .edit-only { display: inline-block; }
@@ -49,8 +52,33 @@ export const STYLE = `
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }`;
 
-/** The data content — heading, matrix, issues, surfaces, plan. No toolbar, no script. */
-export function renderContent(data, { title = DEFAULT_TITLE } = {}) {
+const COMPLEXITIES = Array.from({ length: 10 }, (_, n) => n + 1);
+const SEVERITIES = Object.keys(SEV_ORDER);
+
+/** A title attribute naming Jev (with its confidence) on a cell Jev set and nobody has confirmed. */
+function jevTitle(issue, field, assessments) {
+  const t = issue.triage?.[field];
+  if (t?.source !== 'jev') return '';
+  const judgment = typeof t.assessment === 'string' ? judgmentOf(assessments, t.assessment, issue.id, field) : undefined;
+  const confidence = field === 'complexity' ? judgment?.top : judgment?.confidence;
+  return ` title="${typeof confidence === 'number' ? `Jev ${pct(confidence)}` : 'Jev'}"`;
+}
+
+/** An edit-mode <select>; an unset field shows a disabled — so it cannot be submitted. */
+function triageSelect(act, label, issue, values, current) {
+  const list = current == null || values.includes(current) ? values : [...values, current];
+  const options = list.map(v => `<option value="${esc(v)}"${v === current ? ' selected' : ''}>${esc(v)}</option>`).join('');
+  const none = current == null ? '<option value="" disabled selected>—</option>' : '';
+  return `<select class="edit-only" data-act="${act}" aria-label="${label} of ${esc(issue.id)}">${none}${options}</select>`;
+}
+
+const ISSUE_HEAD = '<thead><tr><th>ID</th><th>Severity</th><th>Category</th><th>Cx</th><th>Feature</th><th>Title</th><th>Status</th></tr></thead>';
+
+/**
+ * The data content — heading, matrix, issues, triage queue, surfaces, plan. No toolbar, no script.
+ * `categories` is the list in effect: it feeds the category select and the triage queue.
+ */
+export function renderContent(data, { title = DEFAULT_TITLE, categories = resolveCategories() } = {}) {
   const { features = [], issues = [], runs = [] } = data;
   const open = issues.filter(i => i.status === 'open');
   const closed = issues.filter(i => i.status !== 'open');
@@ -73,16 +101,25 @@ export function renderContent(data, { title = DEFAULT_TITLE } = {}) {
     </tr>`;
   }).join('\n');
 
+  const names = categories.map(c => c.name);
   const renderIssueRows = list => list.map(i => `
-    <tr data-issue="${esc(i.id)}"><td>${esc(i.id)}</td><td class="sev ${esc(i.severity)}">${esc(i.severity)}</td>
-    <td>${esc(i.type)}</td><td>${esc(i.title)}</td><td>${esc(i.feature)}</td>
+    <tr data-issue="${esc(i.id)}"><td>${esc(i.id)}</td>
+    <td class="sev ${esc(i.severity ?? 'none')}"${jevTitle(i, 'severity', data.assessments)}><span class="iv">${esc(i.severity ?? '—')}</span>${triageSelect('iseverity', 'Severity', i, SEVERITIES, i.severity)}</td>
+    <td${jevTitle(i, 'category', data.assessments)}><span class="iv">${esc(i.category ?? '—')}</span>${triageSelect('icategory', 'Category', i, names, i.category)}</td>
+    <td${jevTitle(i, 'complexity', data.assessments)}><span class="iv">${esc(i.complexity ?? '—')}</span>${triageSelect('icomplexity', 'Complexity', i, COMPLEXITIES, i.complexity)}</td>
+    <td>${esc(i.feature)}</td><td>${esc(i.title)}</td>
     <td><span class="iv">${esc(i.status)}</span><select class="edit-only" data-act="istatus" aria-label="Status of ${esc(i.id)}">
       ${ISSUE_STATUS.map(s => `<option ${s === i.status ? 'selected' : (s === 'verified-fixed' ? 'disabled title="Recorded by a run: add-run --verified"' : '')}>${s}</option>`).join('')}
     </select></td></tr>`).join('\n');
-  const openRows = renderIssueRows([...open].sort((a, b) => SEV_ORDER[a.severity] - SEV_ORDER[b.severity]));
-  const closedRows = renderIssueRows([...closed].sort((a, b) =>
-    (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99)
-    || SEV_ORDER[a.severity] - SEV_ORDER[b.severity]));
+  const openRows = renderIssueRows([...open].sort(openOrder));
+  const closedRows = renderIssueRows([...closed].sort(closedOrder));
+
+  const queueRows = triageQueue(data, categories).map(q => `<tr><td>${esc(q.issue)}</td><td>${esc(q.field)}</td><td>${esc(q.kind)}</td>
+    <td>${esc(q.current ?? '—')}</td><td>${esc(q.suggested ?? '—')}</td><td class="num">${q.confidence == null ? '—' : pct(q.confidence)}</td><td>${esc(q.reason)}</td></tr>`).join('\n');
+  const queueBlock = queueRows ? `<div class="tablewrap"><table>
+    <thead><tr><th>Issue</th><th>Field</th><th>Kind</th><th>Current</th><th>Suggested</th><th>Confidence</th><th>Reason</th></tr></thead>
+    <tbody>${queueRows}</tbody>
+  </table></div>` : '<p class="meta">Triage queue empty.</p>';
 
   const flat = flattenSurfaces(data.surfaces ?? []);
   const featName = Object.fromEntries(features.map(f => [f.id, f.name]));
@@ -114,15 +151,20 @@ export function renderContent(data, { title = DEFAULT_TITLE } = {}) {
     <tbody>${matrixRows || '<tr><td colspan="9" class="meta">No features yet. Add one with <code>qa-tracker add-feature</code>.</td></tr>'}</tbody>
   </table></div>
   <h2>Open issues</h2>
+  <div class="legend">
+    <div><b>Severity</b> = impact on users (critical → low) · <b>Complexity</b> = effort to fix, 1–10 · <b>Status</b> = lifecycle (open → fixed → verified-fixed, or wont-fix) · ᴶ = set by Jev, not yet confirmed.</div>
+  </div>
   <div class="tablewrap"><table>
-    <thead><tr><th>ID</th><th>Severity</th><th>Type</th><th>Title</th><th>Feature</th><th>Status</th></tr></thead>
-    <tbody>${openRows || '<tr><td colspan="6" class="meta">No open issues.</td></tr>'}</tbody>
+    ${ISSUE_HEAD}
+    <tbody>${openRows || '<tr><td colspan="7" class="meta">No open issues.</td></tr>'}</tbody>
   </table></div>
   <h2>Closed issues</h2>
   <div class="tablewrap closed-issues"><table>
-    <thead><tr><th>ID</th><th>Severity</th><th>Type</th><th>Title</th><th>Feature</th><th>Status</th></tr></thead>
-    <tbody>${closedRows || '<tr><td colspan="6" class="meta">No closed issues yet.</td></tr>'}</tbody>
-  </table></div>${surfacesBlock}
+    ${ISSUE_HEAD}
+    <tbody>${closedRows || '<tr><td colspan="7" class="meta">No closed issues yet.</td></tr>'}</tbody>
+  </table></div>
+  <h2>Triage queue</h2>
+  ${queueBlock}${surfacesBlock}
   <h2>Next run plan</h2>
   <ol>${planItems || '<li>All features at target.</li>'}</ol>`;
 }

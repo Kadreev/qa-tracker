@@ -131,3 +131,67 @@ test('triage queue lists Jev disagreements with a percentage', () => {
 test('no warnings, no Warnings block', () => {
   assert.ok(!renderMarkdown(data).includes('**Warnings**'));
 });
+
+// --- dashboard triage columns, controls and queue ---
+const dashIssues = [
+  issue('QA-1', { severity: 'high', category: 'accessibility', complexity: 5,
+    triage: { category: { source: 'jev', assessment: 'asm-2026-10-04' }, complexity: { source: 'jev', assessment: 'asm-2026-10-04' }, severity: { source: 'jev', assessment: 'asm-gone' } } }),
+  issue('QA-2', { complexity: 1 }),
+  issue('QA-3', { severity: 'high', complexity: 2, category: 'mystery', triage: { category: { source: 'set' } } }),
+  issue('QA-4', { status: 'fixed' }),
+  issue('QA-5', { status: 'fixed', severity: 'low' }),
+];
+const dashData = {
+  ...structuredClone(data),
+  issues: dashIssues,
+  assessments: [{ id: 'asm-2026-10-04', date: '2026-10-04', model: 'jev-latest', rubric: 1,
+    issues: { 'QA-1': { category: { value: 'accessibility', confidence: 0.91 }, complexity: { value: 5, top: 0.62, probabilities: { 5: 0.62 } } } } }],
+};
+const dashCats = [{ name: 'functional' }, { name: 'accessibility' }, { name: 'other' }];
+const dash = renderContent(dashData, { title: 'T', categories: dashCats });
+const rowOf = id => dash.split(`data-issue="${id}"`)[1].split('</tr>')[0];
+
+test('dashboard issues sort like STATUS.md; unset severity does not break ordering', () => {
+  const order = [...dash.matchAll(/data-issue="(QA-\d)"/g)].map(m => m[1]);
+  assert.deepEqual(order, ['QA-3', 'QA-1', 'QA-2', 'QA-5', 'QA-4']);
+});
+
+test('dashboard issue cells: Cx column, sev none, em dash for unset', () => {
+  assert.ok(dash.includes('<th>ID</th><th>Severity</th><th>Category</th><th>Cx</th><th>Feature</th><th>Title</th><th>Status</th>'));
+  assert.ok(!dash.includes('<th>Type</th>'));
+  assert.ok(rowOf('QA-2').includes('class="sev none"><span class="iv">—</span>'));
+  assert.ok(rowOf('QA-2').includes('<td><span class="iv">—</span><select class="edit-only" data-act="icategory"'));
+});
+
+test('Jev-owned cells carry a confidence tooltip, others none', () => {
+  const r = rowOf('QA-1');
+  assert.ok(r.includes('title="Jev 91%"'), r);
+  assert.ok(r.includes('title="Jev 62%"'), r);
+  assert.ok(r.includes('title="Jev"'), 'severity whose assessment is missing gets a bare Jev title');
+  assert.ok(!rowOf('QA-3').includes('title="Jev'));
+});
+
+test('edit-mode selects for category, complexity and severity', () => {
+  const r = rowOf('QA-1');
+  assert.match(r, /<select class="edit-only" data-act="icategory"/);
+  assert.match(r, /<option value="accessibility" selected>/);
+  assert.match(r, /<select class="edit-only" data-act="icomplexity"/);
+  assert.match(r, /<option value="5" selected>/);
+  assert.match(r, /<select class="edit-only" data-act="iseverity"/);
+  assert.match(r, /<option value="high" selected>/);
+  assert.ok(!r.includes('<option value="'.concat('" ')), 'no empty option when everything is set');
+  assert.match(rowOf('QA-2'), /<option value="" disabled selected>—<\/option>/);
+  assert.match(rowOf('QA-3'), /<option value="mystery" selected>/);
+  assert.ok(r.indexOf('<option value="functional"') < r.indexOf('<option value="accessibility"'), 'categories keep list order');
+});
+
+test('dashboard has the legend line and a triage queue between closed issues and surfaces', () => {
+  assert.ok(dash.includes('<b>Severity</b> = impact on users (critical → low)'));
+  assert.ok(dash.includes('ᴶ = set by Jev'));
+  assert.ok(dash.indexOf('Open issues') < dash.indexOf('impact on users') && dash.indexOf('impact on users') < dash.indexOf('Closed issues'));
+  assert.ok(dash.indexOf('Closed issues') < dash.indexOf('Triage queue'));
+  assert.ok(dash.indexOf('Triage queue') < dash.indexOf('Next run plan'));
+  assert.ok(dash.includes('<th>Issue</th><th>Field</th><th>Kind</th><th>Current</th><th>Suggested</th><th>Confidence</th><th>Reason</th>'));
+  const empty = renderContent({ ...structuredClone(data), issues: [issue('QA-9', { severity: 'low', category: 'accessibility', complexity: 2 })] }, { categories: dashCats });
+  assert.ok(empty.includes('Triage queue empty.'));
+});

@@ -3,15 +3,9 @@
 import { nextRunPlan } from './plan.mjs';
 import { flattenSurfaces, surfaceStats } from './surfaces.mjs';
 import { DEFAULT_TITLE } from './config.mjs';
-import { DIM_ICON, SEV_ORDER, STATUS_ORDER, cell, pct } from './format.mjs';
+import { DIM_ICON, cell, pct, openOrder, closedOrder } from './format.mjs';
 import { resolveCategories } from './categories.mjs';
 import { triageQueue } from './triage-policy.mjs';
-
-const UNSET = 99; // sorts after every real rank
-const rank = (order, key) => order[key] ?? UNSET;
-const bySeverity = (a, b) => rank(SEV_ORDER, a.severity) - rank(SEV_ORDER, b.severity);
-const byComplexity = (a, b) => (a.complexity ?? UNSET) - (b.complexity ?? UNSET);
-const byStatus = (a, b) => rank(STATUS_ORDER, a.status) - rank(STATUS_ORDER, b.status);
 
 /** A field's value, or — when unset; suffixed ᴶ while its triage source is Jev. */
 const triaged = (issue, field) =>
@@ -36,7 +30,6 @@ export function renderMarkdown(data, { title = DEFAULT_TITLE, categories = resol
       + `| ${cell((f.issues ?? []).join(', ')) || '—'} |`;
   }).join('\n');
 
-  // Array.prototype.sort is stable, so ties keep file order.
   const issueRows = (list, compare) => [...list].sort(compare)
     .map(i => `| ${cell(i.id)} | ${triaged(i, 'severity')} | ${triaged(i, 'category')} | ${triaged(i, 'complexity')} `
       + `| ${cell(i.feature)} | ${cell(i.title)} | ${cell(i.status)} |`)
@@ -86,11 +79,11 @@ ${matrix || '| — | — | — | — | — | — | — | — | — |'}
 
 ## Open issues (by severity)
 ${issueHeader}
-${issueRows(open, (a, b) => bySeverity(a, b) || byComplexity(a, b)) || noIssues}
+${issueRows(open, openOrder) || noIssues}
 
 ## Closed issues
 ${issueHeader}
-${issueRows(closed, (a, b) => byStatus(a, b) || bySeverity(a, b)) || noIssues}
+${issueRows(closed, closedOrder) || noIssues}
 
 ## Triage queue
 ${queueBlock}${warningBlock}${surfaceBlock}

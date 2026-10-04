@@ -41,6 +41,9 @@ All notable changes to this project are documented here. The format follows
   Status legend, and a "Triage queue" section (with the issue warnings under it).
   Open issues sort by severity, then complexity, unset last. `status` prints the
   same text as `STATUS.md`.
+- The dashboard shows the Category and Cx columns (Jev-set values carry a "Jev 91%"
+  tooltip), a "Triage queue" section, and edit-mode selects for category,
+  complexity and severity that record explicit values like `set`.
 
 ### Changed
 - The `Type` column is gone from the `STATUS.md` issue tables; the category
