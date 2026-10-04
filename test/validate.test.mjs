@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { validate } from '../src/validate.mjs';
+import { validate, validateAll, isLogWarning } from '../src/validate.mjs';
+import { assessmentIndex, judgmentOf, latestFor } from '../src/assessments.mjs';
 import { LEVELS } from '../src/schema.mjs';
 
 function goodData() {
@@ -20,6 +21,7 @@ function goodData() {
       features_touched: ['notes-list'], level_changes: { 'notes-list': 'L0->L2' },
       issues_opened: ['QA-2'], issues_verified: [],
     }],
+    assessments: [],
   };
 }
 
@@ -145,4 +147,186 @@ test('empty or scalar list entries are reported, not thrown', () => {
   assert.match(errs, /features.yaml entry 2 must be a mapping/);
   assert.match(errs, /issues.yaml entry 2 must be a mapping/);
   assert.match(errs, /runs.yaml entry 2 must be a mapping/);
+});
+
+// --- categories, complexity, triage provenance and assessments.yaml ---
+
+const judged = (over = {}) => ({
+  id: 'asm-2026-10-04', date: '2026-10-04', model: 'jev-1.13.0', rubric: 1,
+  issues: {
+    'QA-2': {
+      category: { value: 'functional', confidence: 0.9, probabilities: { functional: 0.9, other: 0.1 } },
+      complexity: { value: 3, top: 0.6, score: 3.1, confidence: 0.7, probabilities: { 3: 0.6 } },
+      severity: { value: 'high', confidence: 0.9, probabilities: { high: 0.9, low: 0.1 } },
+      applied: ['category'],
+    },
+  },
+  ...over,
+});
+
+test('a 0.2.0-shaped tracker has no errors and no warnings', () => {
+  assert.deepEqual(validateAll(goodData()), { errors: [], warnings: [] });
+  const noAssessments = goodData();
+  delete noAssessments.assessments;
+  assert.deepEqual(validateAll(noAssessments), { errors: [], warnings: [] });
+});
+
+test('severity is optional but must be known when present', () => {
+  const d = goodData();
+  delete d.issues[0].severity;
+  assert.deepEqual(validate(d), []);
+  d.issues[0].severity = 'urgent';
+  assert.match(validate(d).join(), /severity invalid/);
+});
+
+test('complexity must be an integer 1-10', () => {
+  const d = goodData();
+  for (const bad of [0, 11, 2.5, '3']) {
+    d.issues[0].complexity = bad;
+    assert.match(validate(d).join(), /complexity must be an integer 1-10/, `complexity ${JSON.stringify(bad)}`);
+  }
+  d.issues[0].complexity = 10;
+  assert.deepEqual(validate(d), []);
+});
+
+test('details must be a string', () => {
+  const d = goodData();
+  d.issues[0].details = 'Tab moves focus but nothing is drawn.';
+  assert.deepEqual(validate(d), []);
+  d.issues[0].details = 42;
+  assert.match(validate(d).join(), /details must be a string/);
+});
+
+test('category must be kebab-case and type must follow a listed category', () => {
+  const d = goodData();
+  d.issues[0].category = 'Bad Cat';
+  assert.match(validate(d).join(), /category must be kebab-case/);
+  d.issues[0].category = 'accessibility';
+  d.issues[0].type = 'functionality';
+  assert.match(validate(d).join(), /type must be usability/);
+  d.issues[0].type = 'usability';
+  assert.deepEqual(validate(d), []);
+  d.issues[0].category = 'other';
+  d.issues[0].type = 'code';
+  assert.deepEqual(validate(d), []);
+});
+
+test('a category missing from the list is a warning, not an error', () => {
+  const d = goodData();
+  d.issues[0].category = 'checkout';
+  const { errors, warnings } = validateAll(d);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(warnings, ['issue QA-2: category checkout is not in the category list']);
+  assert.equal(isLogWarning(warnings[0]), false);
+});
+
+test('categories come from opts.categories when given', () => {
+  const d = goodData();
+  d.issues[0].category = 'checkout';
+  d.issues[0].type = 'usability';
+  const categories = [{ name: 'checkout', type: 'usability', description: 'x' }, { name: 'other', type: null, description: 'y' }];
+  assert.deepEqual(validateAll(d, { categories }), { errors: [], warnings: [] });
+  d.issues[0].type = 'code';
+  assert.match(validate(d, { categories }).join(), /type must be usability/);
+});
+
+test('triage entries are shape-checked', () => {
+  const d = goodData();
+  d.issues[0].triage = { severity: { source: 'ai' } };
+  assert.match(validate(d).join(), /triage\.severity: source must be jev or set/);
+  d.issues[0].triage = { category: { source: 'jev' } };
+  assert.match(validate(d).join(), /triage\.category: source jev needs an assessment id/);
+  d.issues[0].triage = { wat: { source: 'set' } };
+  assert.match(validate(d).join(), /triage\.wat: unknown triage field/);
+  d.issues[0].triage = 'jev';
+  assert.match(validate(d).join(), /triage must be a mapping/);
+  d.issues[0].triage = { severity: { source: 'set', seen: 7 } };
+  assert.match(validate(d).join(), /triage\.severity: seen must be a string/);
+  d.issues[0].triage = { severity: { source: 'set', seen: 'asm-2026-10-04' }, category: { source: 'set' } };
+  assert.deepEqual(validate({ ...d, assessments: [judged()] }), []);
+});
+
+test('assessments.yaml shape errors', () => {
+  const cases = [
+    [judged({ id: 'asm-1' }), /id must look like asm-YYYY-MM-DD/],
+    [judged({ model: '' }), /model is required/],
+    [judged({ date: '04/10/2026' }), /date must be YYYY-MM-DD/],
+    [judged({ rubric: 0 }), /rubric must be a positive integer/],
+    [judged({ issues: [] }), /issues must be a mapping/],
+    [judged({ issues: { 'QA-2': { category: { value: 'functional', confidence: 1.2 } } } }), /category\.confidence must be a number from 0 to 1/],
+    [judged({ issues: { 'QA-2': { complexity: { value: 11, confidence: 0.5 } } } }), /complexity\.value must be an integer 1-10/],
+    [judged({ issues: { 'QA-2': { severity: { value: 'urgent', confidence: 0.5 } } } }), /severity\.value invalid: urgent/],
+    [judged({ issues: { 'QA-2': { applied: ['type'] } } }), /applied has unknown field type/],
+  ];
+  for (const [entry, re] of cases) {
+    const d = goodData();
+    d.assessments = [entry];
+    assert.match(validate(d).join('\n'), re);
+  }
+  const dup = goodData();
+  dup.assessments = [judged(), judged()];
+  assert.match(validate(dup).join(), /duplicate assessment id: asm-2026-10-04/);
+  const notList = goodData();
+  notList.assessments = { id: 'x' };
+  assert.match(validate(notList).join(), /assessments.yaml must be a YAML list/);
+  const scalar = goodData();
+  scalar.assessments = [null];
+  assert.match(validate(scalar).join(), /assessments.yaml entry 1 must be a mapping/);
+});
+
+test('a well-formed assessment passes', () => {
+  const d = goodData();
+  d.assessments = [judged()];
+  d.issues[0].triage = { category: { source: 'jev', assessment: 'asm-2026-10-04' } };
+  d.issues[0].category = 'functional';
+  assert.deepEqual(validateAll(d), { errors: [], warnings: [] });
+});
+
+test('log problems are warnings that never fail validation', () => {
+  const ghost = goodData();
+  ghost.assessments = [judged({ issues: { 'QA-404': { severity: { value: 'low', confidence: 0.9 } } } })];
+  let r = validateAll(ghost);
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.warnings, ['assessment asm-2026-10-04: issue QA-404 does not exist']);
+  assert.ok(isLogWarning(r.warnings[0]));
+
+  const missing = goodData();
+  missing.issues[0].category = 'functional';
+  missing.issues[0].triage = { category: { source: 'jev', assessment: 'asm-2099-01-01' } };
+  r = validateAll(missing);
+  assert.deepEqual(r.errors, []);
+  assert.equal(r.warnings.length, 1);
+  assert.match(r.warnings[0], /^issue QA-2: triage category: assessment asm-2099-01-01 does not exist/);
+  assert.ok(isLogWarning(r.warnings[0]));
+
+  const elsewhere = goodData();
+  elsewhere.issues.push({ id: 'QA-3', title: 't', type: 'code', feature: 'notes-list', status: 'open' });
+  elsewhere.assessments = [judged()];
+  elsewhere.issues[1].triage = { severity: { source: 'jev', assessment: 'asm-2026-10-04' } };
+  r = validateAll(elsewhere);
+  assert.deepEqual(r.errors, []);
+  assert.match(r.warnings.join(), /issue QA-3: triage severity: assessment asm-2026-10-04 does not mention this issue/);
+
+  const edited = goodData();
+  edited.assessments = [judged()];
+  edited.issues[0].category = 'data';
+  edited.issues[0].triage = { category: { source: 'jev', assessment: 'asm-2026-10-04' } };
+  r = validateAll(edited);
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.warnings, ['issue QA-2: category data differs from what assessment asm-2026-10-04 said (functional); treated as set by hand']);
+  assert.equal(isLogWarning(r.warnings[0]), false);
+});
+
+test('assessment helpers look up by file order and tolerate junk', () => {
+  const log = [judged({ id: 'asm-2026-10-04' }), null, judged({ id: 'asm-2026-10-05' }), judged({ id: 'asm-2026-10-06', issues: { 'QA-9': {} } })];
+  assert.equal(assessmentIndex(log, 'asm-2026-10-05'), 2);
+  assert.equal(assessmentIndex(log, 'asm-1999-01-01'), -1);
+  assert.equal(assessmentIndex(undefined, 'x'), -1);
+  assert.equal(judgmentOf(log, 'asm-2026-10-04', 'QA-2', 'category').value, 'functional');
+  assert.equal(judgmentOf(log, 'asm-2026-10-04', 'QA-9', 'category'), undefined);
+  assert.equal(judgmentOf(log, 'asm-1999-01-01', 'QA-2', 'category'), undefined);
+  assert.equal(latestFor(log, 'QA-2').entry.id, 'asm-2026-10-05');
+  assert.equal(latestFor(log, 'QA-2').index, 2);
+  assert.equal(latestFor(log, 'QA-9').index, 3);
+  assert.equal(latestFor(log, 'QA-404'), null);
 });

@@ -8,6 +8,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 - Issue categories: a default list of 11, replaceable in `qa-tracker.config.json`.
+- New optional issue fields: `details`, `category`, `complexity` (1-10, effort to
+  fix) and `triage` (where each triage value came from), plus an append-only
+  `assessments.yaml` log, all documented in `docs/SCHEMA.md`. Existing trackers
+  stay valid without changes.
+- `validateAll(data, opts)` returns `{ errors, warnings }` and `store.check()`
+  runs it on the stored data; warnings (a category outside the list, a dangling
+  assessment reference, a hand-edited Jev value) never block a write.
+
+### Changed
+- `severity` is no longer required on an issue; when present it must still be
+  one of `critical`, `high`, `medium` or `low`.
 
 ## [0.2.0] - 2026-10-04
 

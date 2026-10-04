@@ -6,7 +6,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { parse, parseDocument, isSeq, isMap } from 'yaml';
-import { validate } from './validate.mjs';
+import { validate, validateAll } from './validate.mjs';
 import { applyChange } from './edit.mjs';
 import { renderMarkdown } from './markdown.mjs';
 import { loadSurfaceFiles, renderSurfaces, surfaceFile } from './surfaces.mjs';
@@ -45,7 +45,8 @@ export function createStore(cfg) {
     surfaces: loadSurfaceFiles(files.surfacesDir),
   });
 
-  const check = d => validate(d, { exists });
+  const checkOpts = { exists, categories: cfg.categories };
+  const errorsOf = d => validate(d, checkOpts);
 
   function writeStatus(d = data()) {
     writeAtomic(files.status, renderMarkdown(d, { title: cfg.title }));
@@ -65,7 +66,7 @@ export function createStore(cfg) {
       ...Object.fromEntries(ENTITIES.map(k => [k, asList(docs[k].toJS())])),
       surfaces: loadSurfaceFiles(files.surfacesDir),
     };
-    const errs = check(next);
+    const errs = errorsOf(next);
     if (errs.length) return { ok: false, error: 'validation failed: ' + errs.join('; ') };
 
     for (const k of ENTITIES) {
@@ -103,7 +104,7 @@ export function createStore(cfg) {
       // Validate against the would-be state before touching disk.
       const d = data();
       d.surfaces[d.surfaces.findIndex(s => s.file === file)] = surfaceFile(file, doc.toJS());
-      const errs = check(d);
+      const errs = errorsOf(d);
       if (errs.length) return { ok: false, error: 'validation failed: ' + errs.join('; ') };
 
       writeAtomic(full, doc.toString(YAML_OUT));
@@ -113,7 +114,7 @@ export function createStore(cfg) {
     return { ok: false, error: `unknown surface: ${id}` };
   }
 
-  return { config: cfg, data, readDocs, validate: () => check(data()), writeStatus, commit, setVerdict };
+  return { config: cfg, data, readDocs, validate: () => errorsOf(data()), check: () => validateAll(data(), checkOpts), writeStatus, commit, setVerdict };
 }
 
 function findSurface(seq, id) {
