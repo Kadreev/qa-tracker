@@ -255,18 +255,15 @@ function jevFetch() {
   const fetch = async () => {
     fetch.calls++;
     const levels = Object.fromEntries(Array.from({ length: 10 }, (_, i) => [String(i), i === 2 ? 0.8 : 0.2 / 9]));
-    return {
-      ok: true, status: 200,
-      json: async () => ({
-        model: 'jev-1.13.0',
-        usage: { input_tokens: 10, output_tokens: 2 },
-        answers: {
-          category: { type: 'choice', choice: 'accessibility', confidence: 0.91, probabilities: { accessibility: 0.91, other: 0.09 } },
-          complexity: { type: 'score', score: 2, confidence: 0.8, probabilities: levels, legend: {} },
-          severity: { type: 'choice', choice: 'medium', confidence: 0.9, probabilities: { medium: 0.9, low: 0.1 } },
-        },
-      }),
-    };
+    return new Response(JSON.stringify({
+      model: 'jev-1.13.0',
+      usage: { input_tokens: 10, output_tokens: 2 },
+      answers: {
+        category: { type: 'choice', choice: 'accessibility', confidence: 0.91, probabilities: { accessibility: 0.91, other: 0.09 } },
+        complexity: { type: 'score', score: 2, confidence: 0.8, probabilities: levels, legend: {} },
+        severity: { type: 'choice', choice: 'medium', confidence: 0.9, probabilities: { medium: 0.9, low: 0.1 } },
+      },
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
   };
   fetch.calls = 0;
   return fetch;
@@ -418,7 +415,7 @@ test('add-issue --assess=false and --no-assess=false mean what they say', async 
 
 test('a failing auto-assess warns and still saves the issue', async () => {
   const cwd = await triageProject({ config: { jev: { auto_assess: true } } });
-  const fetch = async () => ({ ok: false, status: 422, json: async () => ({ error: { message: 'state too large' } }) });
+  const fetch = async () => new Response(JSON.stringify({ error: { message: 'state too large' } }), { status: 422, headers: { 'content-type': 'application/json' } });
   const r = await runWith(cwd, { env: { TYPESAFE_API_KEY: 'sk-secret-123' }, fetch }, 'add-issue', '--feature', 'a', '--title', 'Menu');
   assert.equal(r.code, 0, r.err);
   assert.match(r.err, /^warning: /m);

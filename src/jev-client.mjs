@@ -11,7 +11,8 @@
 export const API_URL = 'https://api.typesafe.ai/v1/systemone';
 
 const DEFAULT_DELAYS = [1000, 2000, 4000];
-const SIZE_HINT = 'request rejected; if `details` is long, shorten it';
+const SIZE_HINT = ' — if `details` is long, shorten it';
+const SIZE_COMPLAINT = /size|length|token|too large/i;
 
 /** An error from the Jev API. `status` is null for network errors and timeouts; `fatal` only for 401. */
 export class JevError extends Error {
@@ -29,26 +30,19 @@ function isTimeout(err) {
   return err?.name === 'TimeoutError' || err?.name === 'AbortError';
 }
 
-/** Read a response body as { json, text }; either may be null. Never throws except on a read failure. */
+/** Read a response body as { json, text }; json is null unless the text parses. Throws only on a read failure. */
 async function readBody(res) {
-  if (typeof res.text === 'function') {
-    const text = await res.text();
-    try {
-      return { json: JSON.parse(text), text };
-    } catch {
-      return { json: null, text };
-    }
-  }
+  const text = await res.text();
   try {
-    return { json: await res.json(), text: '' };
+    return { json: JSON.parse(text), text };
   } catch {
-    return { json: null, text: '' };
+    return { json: null, text };
   }
 }
 
 /** The API's own message from an error body, read defensively. */
 function apiMessage({ json, text }) {
-  const m = json?.error?.message ?? json?.message ?? json?.detail ?? text;
+  const m = json?.error?.message ?? json?.message ?? json?.detail ?? (json && !Object.keys(json).length ? '' : text);
   if (typeof m === 'string') return m.trim();
   return m == null || m === '' ? '' : JSON.stringify(m);
 }
@@ -97,7 +91,7 @@ export async function askJev(body, {
       }
       if (status === 401) throw new JevError('TypeSafe rejected the API key (401)', { status, fatal: true });
       const detail = scrub(apiMessage(parsed));
-      if (status === 422) throw new JevError(`${detail ? detail + ' — ' : ''}${SIZE_HINT}`, { status });
+      if (status === 422) throw new JevError(`request rejected (422)${detail ? ': ' + detail : ''}${SIZE_COMPLAINT.test(detail) ? SIZE_HINT : ''}`, { status });
       const error = new JevError(`TypeSafe returned ${status}${detail ? ': ' + detail : ''}`, { status });
       if (status !== 429 && status !== 529) throw error;
       failure = error;

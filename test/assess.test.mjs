@@ -96,7 +96,7 @@ function fakeFetch(overrides = {}) {
     const title = JSON.parse(init.body).state.issue.title;
     calls.push(title);
     const { status, body } = overrides[title] ?? REPLIES[title];
-    return { ok: status >= 200 && status < 300, status, json: async () => body };
+    return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
   }
   fetch.calls = calls;
   return fetch;

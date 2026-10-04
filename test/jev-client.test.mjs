@@ -12,9 +12,10 @@ const OK_BODY = {
   usage: { input_tokens: 5, output_tokens: 2 },
 };
 
-function reply(status, body) {
-  return { ok: status >= 200 && status < 300, status, json: async () => body };
-}
+// Real Response objects, so the client's text() + JSON.parse path is what runs. A body can
+// be read once, so a reply is a factory: fakeFetch calls it afresh for every request.
+const reply = (status, body) => () => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+const replyText = (status, text) => () => new Response(text, { status, headers: { 'content-type': 'text/plain' } });
 
 /** A fake fetch that serves `steps` in order; a function step is called, an Error step is thrown. */
 function fakeFetch(steps) {
@@ -97,31 +98,42 @@ test('custom delays set the number of retries', async () => {
   assert.deepEqual(sleep.delays, [5]);
 });
 
-test('422 surfaces the API message and the size hint', async () => {
+test('422 surfaces the API message; a size complaint also gets the details hint', async () => {
   const fetch = fakeFetch([reply(422, { error: { message: 'state is too large' } })]);
   const sleep = fakeSleep();
   await assert.rejects(askJev({}, { apiKey: KEY, fetch, sleep }), (err) => {
     assert.equal(err.status, 422);
     assert.equal(err.fatal, false);
-    assert.match(err.message, /state is too large/);
-    assert.match(err.message, /shorten it/);
+    assert.equal(err.message, 'request rejected (422): state is too large — if `details` is long, shorten it');
     return true;
   });
   assert.equal(fetch.calls.length, 1);
   assert.deepEqual(sleep.delays, []);
 });
 
+test('422 hints at shortening details only when the message is about size', async () => {
+  const message = async (body) => askJev({}, { apiKey: KEY, fetch: fakeFetch([body]), sleep: fakeSleep() }).then(
+    () => assert.fail('should have rejected'),
+    (e) => e.message,
+  );
+  for (const m of ['payload exceeds the maximum size', 'input length 9000 over the limit', 'too many tokens', 'Request TOO LARGE'])
+    assert.match(await message(reply(422, { message: m })), /shorten it/, m);
+  for (const m of ['unknown question id', 'severity is not a valid choice', ''])
+    assert.doesNotMatch(await message(reply(422, { message: m })), /shorten|details/, m);
+  assert.equal(await message(reply(422, { message: 'unknown question id' })), 'request rejected (422): unknown question id');
+  assert.equal(await message(reply(422, {})), 'request rejected (422)');
+});
+
 test('422 reads the message defensively', async () => {
   for (const [body, want] of [
     [{ message: 'top-level message' }, /top-level message/],
     [{ detail: 'a detail string' }, /a detail string/],
-    [{}, /shorten it/],
+    [{}, /request rejected \(422\)$/],
   ]) {
     const fetch = fakeFetch([reply(422, body)]);
     await assert.rejects(askJev({}, { apiKey: KEY, fetch, sleep: fakeSleep() }), want);
   }
-  const text = { ok: false, status: 422, json: async () => { throw new SyntaxError('no json'); }, text: async () => 'plain text reason' };
-  await assert.rejects(askJev({}, { apiKey: KEY, fetch: fakeFetch([text]), sleep: fakeSleep() }), /plain text reason/);
+  await assert.rejects(askJev({}, { apiKey: KEY, fetch: fakeFetch([replyText(422, 'plain text reason')]), sleep: fakeSleep() }), /plain text reason/);
 });
 
 test('other 4xx and 5xx statuses are not retried', async () => {
@@ -152,7 +164,7 @@ test('a network error is retried, a malformed body is not', async () => {
   const list = fakeFetch([reply(200, { model: 'jev-1.13.0', answers: ['a'], usage: {} })]);
   await assert.rejects(askJev({}, { apiKey: KEY, fetch: list, sleep: fakeSleep() }), /malformed/);
 
-  const notJson = fakeFetch([{ ok: true, status: 200, json: async () => { throw new SyntaxError('Unexpected token'); } }]);
+  const notJson = fakeFetch([replyText(200, '<html>not json</html>')]);
   await assert.rejects(askJev({}, { apiKey: KEY, fetch: notJson, sleep: fakeSleep() }), /malformed/);
 });
 
