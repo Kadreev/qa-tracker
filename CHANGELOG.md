@@ -50,6 +50,14 @@ All notable changes to this project are documented here. The format follows
   (issues by feature, severity × status, work queue with the triage queue size
   and quick wins). `summarize(data, { categories })` returns the same numbers.
 - `STATUS.md` opens with a `## Summary` block of the same numbers.
+- Programmatic API: `applyChange` takes the kinds `issue-category`,
+  `issue-complexity`, `issue-severity`, `issue-details` and `add-assessment`
+  (the last one applies the confident answers and appends the log entry in one
+  commit). New exports: `resolveCategories` and `DEFAULT_CATEGORIES`,
+  `assessmentIndex`, `judgmentOf` and `latestFor` (read `assessments.yaml`),
+  `nextAssessmentId`, `validateAll` with `isLogWarning`, and `summarize` with
+  `SEVERITY_WEIGHT`, plus the triage constants in the schema.
+- `set <issue> details ""` clears an issue's details.
 - Docs: a "Triage with Jev" section in the README (fields, the autonomous flow,
   the triage queue, exactly what is sent to TypeSafe, key setup, opt-in
   auto-assess), the agent guide and skill without `--severity` as required, the
@@ -58,6 +66,13 @@ All notable changes to this project are documented here. The format follows
   `TYPESAFE_API_KEY`, writes nothing, not part of CI).
 
 ### Changed
+- Closed issues in `STATUS.md` and the dashboard now sort by status (fixed,
+  verified-fixed, wont-fix), then severity, with unset severity last; before, they
+  sorted by severity only.
+- A boolean flag given as `--flag=value` takes only `true`, `1`, `false` or `0`;
+  `--assess=false` used to opt in to sending the issue to TypeSafe. A 422 from
+  Jev now reads `request rejected (422): <message>`, and suggests shortening
+  `details` only when the message is about size.
 - The dashboard legends are now tooltips on the column headers (hover or keyboard
   focus); a print-only legend follows each table so PDF exports keep them. Issue
   IDs no longer wrap.

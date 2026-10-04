@@ -300,6 +300,36 @@ still needs a person. The server never contacts TypeSafe. Each edit is
 validated and written straight back to the YAML, keeping comments and
 formatting. **Export PDF** uses the browser's print dialog.
 
+**Summary.** Above the coverage matrix sit four cards and three panels, all
+computed from the same data as the `## Summary` block at the top of `STATUS.md`:
+
+- **Open issues** — how many are open out of the total, with a bar split by
+  severity (critical, high, medium, low, and *unrated* for issues with no severity).
+  The card is outlined when any open issue is critical.
+- **Fixed** — issues fixed or verified-fixed out of those that are not wont-fix,
+  as a count and a percentage, split into verified and awaiting a re-check.
+- **Coverage** — features at their target level, and the weighted coverage: each
+  feature's progress toward its target, weighted by its `weight`.
+- **Hotspot** — the feature with the worst open issues, its worst issue, and a
+  score that adds up its open issues: critical 8, high 4, medium 2, low 1,
+  unrated 1 (hover the score for the weights). Ties go to the feature with more
+  open issues, then to file order.
+- **Issues by feature** (panel) — one bar per feature with open issues, worst
+  first, coloured by severity and labelled with the counts.
+- **Severity × status** (panel) — a table of issue counts: each severity by open,
+  fixed, verified and wont-fix.
+- **Work queue** (panel) — the next three features to validate (the same ranking as
+  `plan`), the size of the triage queue, and the quick wins: open issues with
+  complexity 3 or less.
+
+The same numbers are available from `summarize(data)` in the programmatic API.
+Every bar sits next to its count, so no number depends on colour alone.
+
+**Legends.** The column legends are tooltips on the table headers (hover, or
+keyboard focus on the header label) instead of a block above the tables. A
+tooltip cannot print, so **Export PDF** adds the legend as a short block after
+each table.
+
 The server binds to `127.0.0.1` and only accepts same-origin JSON requests with a
 loopback `Host`, so a web page you visit can't write to your tracker.
 Adding features, issues and runs stays a CLI action.
