@@ -35,6 +35,15 @@ test('parseArgs handles positionals, flags and both value forms', () => {
   assert.deepEqual(opt, { json: true, dir: 'd', title: 'A b' });
 });
 
+test('a boolean flag takes true/1/false/0 after =, anything else is an error', () => {
+  assert.deepEqual(parseArgs(['--assess=true', '--json=1', '--force=TRUE']).opt, { assess: true, json: true, force: true });
+  assert.deepEqual(parseArgs(['--assess=false', '--no-assess=0', '--json=False']).opt, { assess: false, 'no-assess': false, json: false });
+  assert.throws(() => parseArgs(['--assess=yes']), /--assess takes no value \(or true\/false\)/);
+  assert.throws(() => parseArgs(['--json=']), /--json takes no value/);
+  // a value flag keeps its string
+  assert.deepEqual(parseArgs(['--title=false']).opt, { title: 'false' });
+});
+
 test('a value flag without a value is an error, not `true`', async () => {
   assert.throws(() => parseArgs(['serve', '--port']), /--port needs a value/);
   assert.throws(() => parseArgs(['add-run', '--report', '--date', '2026-01-01']), /--report needs a value/);
@@ -367,6 +376,36 @@ test('add-issue auto-assesses only when opted in', async () => {
   assert.match(w.err, /^warning: .*TYPESAFE_API_KEY/m);
   assert.equal(nokey.calls, 0);
   assert.match(read(keyless, 'issues.yaml'), /id: QA-1/);
+});
+
+test('add-issue --assess=false and --no-assess=false mean what they say', async () => {
+  const add = (cwd, io, ...extra) => runWith(cwd, io, 'add-issue', '--feature', 'a', '--title', 'Sort menu has no focus ring', ...extra);
+  const env = { TYPESAFE_API_KEY: 'sk-secret-123' };
+
+  // --assess=false is the same as no flag: with auto_assess off nothing is sent
+  const off = await triageProject({ config: { jev: { auto_assess: false } } });
+  const quiet = jevFetch();
+  const r = await add(off, { env, fetch: quiet }, '--assess=false');
+  assert.equal(r.code, 0, r.err);
+  assert.equal(quiet.calls, 0);
+  assert.doesNotMatch(r.out, /sending/);
+
+  // --no-assess=false does not veto the config opt-in
+  const on = await triageProject({ config: { jev: { auto_assess: true } } });
+  const sent = jevFetch();
+  assert.equal((await add(on, { env, fetch: sent }, '--no-assess=false')).code, 0);
+  assert.equal(sent.calls, 1);
+
+  // --assess=true opts in, --assess=maybe is a usage error that saves nothing
+  const flagged = jevFetch();
+  assert.equal((await add(off, { env, fetch: flagged }, '--id', 'QA-7', '--assess=true')).code, 0);
+  assert.equal(flagged.calls, 1);
+  const bad = jevFetch();
+  const refused = await add(off, { env, fetch: bad }, '--id', 'QA-8', '--assess=maybe');
+  assert.equal(refused.code, 1);
+  assert.match(refused.err, /--assess takes no value \(or true\/false\)/);
+  assert.equal(bad.calls, 0);
+  assert.doesNotMatch(read(off, 'issues.yaml'), /QA-8/);
 });
 
 test('a failing auto-assess warns and still saves the issue', async () => {

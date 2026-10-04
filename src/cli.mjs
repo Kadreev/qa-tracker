@@ -72,6 +72,7 @@ Docs: ${PKG.homepage}`;
 /**
  * Minimal argv parser: positionals, --flag, --key value, --key=value.
  * Throws when a value flag has no value (`serve --port` would otherwise mean port 1).
+ * A boolean flag takes only true/1/false/0 after `=`, so `--assess=false` really is false.
  */
 export function parseArgs(argv) {
   const pos = [], opt = {};
@@ -80,7 +81,11 @@ export function parseArgs(argv) {
     if (!a.startsWith('--')) { pos.push(a); continue; }
     const eq = a.indexOf('=');
     const key = a.slice(2, eq > 0 ? eq : undefined);
-    if (eq > 0) opt[key] = a.slice(eq + 1);
+    if (eq > 0 && BOOLEAN_FLAGS.has(key)) {
+      const b = { true: true, 1: true, false: false, 0: false }[a.slice(eq + 1).toLowerCase()];
+      if (b === undefined) throw new Error(`--${key} takes no value (or true/false)`);
+      opt[key] = b;
+    } else if (eq > 0) opt[key] = a.slice(eq + 1);
     else if (BOOLEAN_FLAGS.has(key)) opt[key] = true;
     else if (i + 1 >= argv.length || argv[i + 1].startsWith('--')) throw new Error(`--${key} needs a value`);
     else opt[key] = argv[++i];
