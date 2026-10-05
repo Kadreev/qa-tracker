@@ -6,6 +6,84 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Issue categories: a default list of 11, replaceable in `qa-tracker.config.json`.
+- New optional issue fields: `details`, `category`, `complexity` (1-10, effort to
+  fix) and `triage` (where each triage value came from), plus an append-only
+  `assessments.yaml` log, all documented in `docs/SCHEMA.md`. Existing trackers
+  stay valid without changes.
+- `validateAll(data, opts)` returns `{ errors, warnings }` and `store.check()`
+  runs it on the stored data; warnings (a category outside the list, a dangling
+  assessment reference, a hand-edited Jev value) never block a write.
+- `qa-tracker assess [ids…] [--all] [--refresh] [--json]` asks TypeSafe's Jev
+  for each issue's category, complexity and severity, applies the confident
+  answers by the triage policy and logs the run as one `assessments.yaml` entry.
+  By default it takes open issues with a field needing triage. Only the app
+  title, the issue's title and details (first 4,000 characters), its feature's
+  name, area and routes, and the surfaces that list it are sent; recorded labels
+  never are. The key is read from `TYPESAFE_API_KEY` and is never written or
+  printed; `--dry-run` prints the exact request bodies (one JSON array) with no key
+  and no network. A response with a confidence outside 0–1, or naming a
+  different model than the run's first answer, fails only that issue; the rest
+  of the run is still recorded.
+- `qa-tracker triage [--json]` lists the issues that still need a person: a
+  missing category, complexity or severity, and Jev answers that disagree with
+  an explicit value. `get <issue>` shows where each value came from, the latest
+  assessment and any warnings that name the issue.
+- `set <issue> category|complexity|severity|details <value>` records an explicit
+  value; setting a value Jev disagreed with clears it from the triage queue.
+- `add-issue` takes `--details`, `--category`, `--complexity` and an optional
+  `--severity`; an issue added without severity lands in the triage queue.
+- Opt-in auto-assess: with `jev.auto_assess: true` in the config (or `--assess`),
+  `add-issue` sends the new issue to Jev and applies the confident answers;
+  `--no-assess` skips it. A missing key or a failed request prints a warning and
+  the issue is still saved.
+- `STATUS.md` issue tables gain Category and Cx (complexity) columns, with `ᴶ`
+  marking values Jev set that nobody has confirmed, a Severity / Complexity /
+  Status legend, and a "Triage queue" section (with the issue warnings under it).
+  Open issues sort by severity, then complexity, unset last. `status` prints the
+  same text as `STATUS.md`.
+- The dashboard shows the Category and Cx columns (Jev-set values carry the ᴶ mark and a
+  "Jev 91%" tooltip), a "Triage queue" section, and edit-mode selects for category,
+  complexity and severity that record explicit values like `set`.
+- Dashboard summary: four cards above the coverage matrix (open issues with a
+  severity bar, fixed with verified / awaiting check, coverage at target and
+  weighted, and the hotspot feature with its worst open issue) and three panels
+  (issues by feature, severity × status, work queue with the triage queue size
+  and quick wins). `summarize(data, { categories })` returns the same numbers.
+- `STATUS.md` opens with a `## Summary` block of the same numbers.
+- Programmatic API: `applyChange` takes the kinds `issue-category`,
+  `issue-complexity`, `issue-severity`, `issue-details` and `add-assessment`
+  (the last one applies the confident answers and appends the log entry in one
+  commit). New exports: `resolveCategories` and `DEFAULT_CATEGORIES`,
+  `assessmentIndex`, `judgmentOf` and `latestFor` (read `assessments.yaml`),
+  `nextAssessmentId`, `validateAll` with `isLogWarning`, and `summarize` with
+  `SEVERITY_WEIGHT`, plus the triage constants in the schema.
+- `set <issue> details ""` clears an issue's details.
+- Docs: a "Triage with Jev" section in the README (fields, the autonomous flow,
+  the triage queue, exactly what is sent to TypeSafe, key setup, opt-in
+  auto-assess), the agent guide and skill without `--severity` as required, the
+  Acme Notes demo with categories, complexity and an illustrative
+  `assessments.yaml`, and `npm run smoke:jev`, a live check (needs
+  `TYPESAFE_API_KEY`, writes nothing, not part of CI).
+
+### Changed
+- Closed issues in `STATUS.md` and the dashboard now sort by status (fixed,
+  verified-fixed, wont-fix), then severity, with unset severity last; before, they
+  sorted by severity only.
+- A boolean flag given as `--flag=value` takes only `true`, `1`, `false` or `0`;
+  `--assess=false` used to opt in to sending the issue to TypeSafe. A 422 from
+  Jev now reads `request rejected (422): <message>`, and suggests shortening
+  `details` only when the message is about size.
+- The dashboard legends are now tooltips on the column headers (hover or keyboard
+  focus); a print-only legend follows each table so PDF exports keep them. Issue
+  IDs no longer wrap.
+- The `Type` column is gone from the `STATUS.md` issue tables; the category
+  implies it.
+- `severity` is no longer required on an issue; when present it must still be
+  one of `critical`, `high`, `medium` or `low`.
+- `validate` prints warnings (`warning: …`, exit 0) alongside its errors.
+
 ## [0.2.0] - 2026-10-04
 
 Tightens the evidence rules. Trackers whose YAML was hand-edited against them

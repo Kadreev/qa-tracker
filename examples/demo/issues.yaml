@@ -1,34 +1,69 @@
 # Every finding the demo runs raised. Never deleted, only re-statused.
+# `triage` records where each triage value came from: `jev` values were applied
+# from an assessment in assessments.yaml, `set` values were chosen on purpose.
 - id: QA-1
   title: Sign-up form accepts an e-mail with a trailing space and then cannot sign in
+  details: Sign up with "ana@example.com " (trailing space). The account is created, but signing in with the same address fails with "Unknown user".
   severity: medium
+  category: functional
   type: functionality
+  complexity: 2
   feature: sign-in
   status: verified-fixed
   source: https://github.com/acme/notes/issues/12
+  triage:
+    category: { source: jev, assessment: asm-2026-01-21 }
+    complexity: { source: jev, assessment: asm-2026-01-21 }
+    severity: { source: set, seen: asm-2026-01-21 }
 - id: QA-2
   title: Deleting a pinned note leaves an empty card until reload
+  details: Pin a note, then delete it from the list. The card stays on screen with no title or body until the page is reloaded.
   severity: high
+  category: functional
   type: functionality
+  complexity: 4
   feature: notes-list
   status: fixed
   source: https://github.com/acme/notes/issues/15
+  triage:
+    category: { source: set, seen: asm-2026-01-21 }
+    complexity: { source: jev, assessment: asm-2026-01-21 }
+    severity: { source: set, seen: asm-2026-01-21 }
 - id: QA-3
   title: Sort menu has no keyboard focus ring
+  details: Tab moves focus into the sort menu but no outline is drawn, so keyboard users cannot see which option is selected.
   severity: low
+  category: accessibility
   type: usability
   feature: notes-list
   status: open
+  triage:
+    category: { source: jev, assessment: asm-2026-01-21 }
+    severity: { source: set, seen: asm-2026-01-21 }
 - id: QA-4
   title: Autosave drops the last 2 seconds of typing when the tab is closed
+  details: Type into a note and close the tab within 2 seconds. The note reopens without the last words because the debounced save never ran.
   severity: critical
+  category: error-handling
   type: functionality
+  complexity: 3
   feature: note-editor
   status: open
   source: https://github.com/acme/notes/issues/18
+  triage:
+    category: { source: jev, assessment: asm-2026-01-21 }
+    complexity: { source: set }
+    severity: { source: jev, assessment: asm-2026-01-21 }
 - id: QA-5
   title: No-results state says "Error" instead of explaining there were no matches
+  details: Search for a word that appears in no note. The page shows the single word "Error" in red rather than a message that nothing matched.
   severity: medium
+  category: content
   type: usability
+  complexity: 1
   feature: search
   status: open
+  triage:
+    category: { source: jev, assessment: asm-2026-01-21 }
+    complexity: { source: jev, assessment: asm-2026-01-21 }
+    severity: { source: set, seen: asm-2026-01-21 }

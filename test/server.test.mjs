@@ -18,6 +18,7 @@ before(async () => {
   dir = mkdtempSync(path.join(tmpdir(), 'qa-tracker-srv-'));
   await main(['init', '--title', 'Srv'], { ...quiet, cwd: dir });
   await main(['add-feature', 'a', '--name', 'A', '--area', 'X'], { ...quiet, cwd: dir });
+  await main(['add-issue', '--feature', 'a', '--title', 'Unrated'], { ...quiet, cwd: dir });
   server = createServer(createStore(resolveConfig({ cwd: dir, env: {} })));
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   port = server.address().port;
@@ -79,4 +80,79 @@ test('a malformed edit body is a 400, not a 500', async () => {
 
 test('unknown paths are 404', async () => {
   assert.equal((await request('GET', '/nope')).status, 404);
+});
+
+test('the dashboard can set category, complexity and severity', async () => {
+  const origin = `http://localhost:${port}`;
+  for (const change of [
+    { kind: 'issue-category', issue: 'QA-1', value: 'accessibility' },
+    { kind: 'issue-complexity', issue: 'QA-1', value: 4 },
+    { kind: 'issue-severity', issue: 'QA-1', value: 'high' },
+  ]) {
+    const r = await edit(change, { origin });
+    assert.equal(r.status, 200, r.body);
+  }
+  const yaml = readFileSync(path.join(dir, 'qa-tracker', 'issues.yaml'), 'utf8');
+  assert.match(yaml, /category: accessibility/);
+  assert.match(yaml, /complexity: 4/);
+  assert.match(yaml, /severity: high/);
+  assert.equal((yaml.match(/source: set/g) ?? []).length, 3);
+  assert.equal((await edit({ kind: 'issue-severity', issue: 'QA-1', value: 'urgent' }, { origin })).status, 400);
+});
+
+test('the page shows triage columns and the queue', async () => {
+  const { body } = await request('GET', '/');
+  assert.match(body, /data-act="icomplexity"/);
+  assert.match(body, /data-act="icategory"/);
+  assert.match(body, /data-act="iseverity"/);
+  assert.match(body, /Triage queue/);
+  assert.match(body, />Category<\/span><span class="tiptext" role="tooltip" id="tip-cat-open">/);
+  assert.match(body, />Cx<\/span><span class="tiptext" role="tooltip" id="tip-cx-open">/);
+});
+
+test('the page has summary cards and header tooltips', async () => {
+  const { body } = await request('GET', '/');
+  assert.match(body, /class="cards"/);
+  assert.match(body, /Hotspot/);
+  assert.match(body, /role="tooltip"/);
+  assert.match(body, /aria-describedby="tip-W"/);
+  const legendClasses = [...body.matchAll(/class="([^"]*)"/g)].map(m => m[1].split(/\s+/)).flat().filter(c => /legend/.test(c));
+  assert.ok(legendClasses.length > 0);
+  assert.deepEqual([...new Set(legendClasses)], ['legend-print']);
+  const ids = [...body.matchAll(/ id="(tip-[^"]+)"/g)].map(m => m[1]);
+  assert.equal(new Set(ids).size, ids.length, 'tooltip ids are unique');
+  for (const m of body.matchAll(/aria-describedby="([^"]+)"/g)) assert.ok(ids.includes(m[1]), m[1]);
+});
+
+test('no route triggers an assessment', async () => {
+  assert.equal((await edit({ kind: 'add-assessment', assessment: { issues: {} } })).status, 400);
+  const realFetch = globalThis.fetch;
+  const hadKey = Object.hasOwn(process.env, 'TYPESAFE_API_KEY');
+  const priorKey = process.env.TYPESAFE_API_KEY;
+  let calls = 0;
+  globalThis.fetch = () => { calls++; throw new Error('the dashboard server must not make outbound requests'); };
+  process.env.TYPESAFE_API_KEY = 'test-key-not-real';
+  const guarded = createServer(createStore(resolveConfig({ cwd: dir, env: { TYPESAFE_API_KEY: 'test-key-not-real' } })));
+  await new Promise(r => guarded.listen(0, '127.0.0.1', r));
+  try {
+    const gport = guarded.address().port;
+    const send = (method, pathname, body) => new Promise((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port: gport, method, path: pathname, headers: { host: `localhost:${gport}`, 'content-type': 'application/json' } }, res => {
+        let data = '';
+        res.on('data', c => { data += c; });
+        res.on('end', () => resolve({ status: res.statusCode, body: data }));
+      });
+      req.on('error', reject);
+      if (body) req.write(body);
+      req.end();
+    });
+    assert.equal((await send('GET', '/')).status, 200);
+    const r = await send('POST', '/api/edit', JSON.stringify({ kind: 'issue-complexity', issue: 'QA-1', value: 5 }));
+    assert.equal(r.status, 200, r.body);
+    assert.equal(calls, 0);
+  } finally {
+    guarded.close();
+    globalThis.fetch = realFetch;
+    if (hadKey) process.env.TYPESAFE_API_KEY = priorKey; else delete process.env.TYPESAFE_API_KEY;
+  }
 });

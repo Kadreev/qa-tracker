@@ -2,13 +2,18 @@
 # Ids are permanent handles: reuse the id your issue tracker gives the finding
 # (e.g. GH-123, JIRA-45) or let the CLI number them QA-1, QA-2, …
 #
-# Add one with:  npx qa-tracker add-issue --feature sign-in --severity high --title "Login button does nothing on Safari"
+# Add one with:  npx qa-tracker add-issue --feature sign-in --title "Login button does nothing on Safari" --details "Tap Log in on iOS Safari: nothing happens."
+# Severity, category and complexity are optional; what is missing shows up in
+# `npx qa-tracker triage`, and `npx qa-tracker set QA-1 severity high` fills it.
 #
 # - id: QA-1
 #   title: Login button does nothing on Safari
-#   severity: high                # critical | high | medium | low
-#   type: functionality           # code | functionality | usability
+#   details: Tap Log in on iOS Safari: nothing happens.   # free text; sent to TypeSafe by `assess`
+#   severity: high                # optional. critical | high | medium | low (impact on users)
+#   category: functional          # optional. see docs/SCHEMA.md for the list
+#   type: functionality           # code | functionality | usability (follows from the category)
+#   complexity: 3                 # optional. 1-10, effort to fix
 #   feature: sign-in              # must match a feature id
-#   status: open                  # open | fixed | verified-fixed | wont-fix
+#   status: open                  # open | fixed | verified-fixed | wont-fix (lifecycle)
 #   source: https://github.com/acme/app/issues/123
 []

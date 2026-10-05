@@ -9,11 +9,15 @@ import http from 'node:http';
 import { STYLE, renderContent, esc } from './dashboard.mjs';
 
 /** Change kinds the browser may send. Adding entities stays a CLI/agent action. */
-export const BROWSER_KINDS = ['weight', 'target', 'reverify', 'dimension', 'issue-status'];
+export const BROWSER_KINDS = [
+  'weight', 'target', 'reverify', 'dimension', 'issue-status',
+  'issue-category', 'issue-complexity', 'issue-severity',
+];
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 const hostname = host => String(host ?? '').replace(/:\d+$/, '').toLowerCase();
 
-export function page(data, { title }) {
+/** The full HTML page: toolbar, content and the edit script. */
+export function page(data, { title, categories }) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
@@ -27,14 +31,21 @@ export function page(data, { title }) {
     <span id="save-status" role="status"></span>
     <span class="meta">Edits save straight to the YAML files.</span>
   </div>
-  ${renderContent(data, { title })}
+  ${renderContent(data, { title, categories })}
 </main>
 <script>
 (function () {
   var app = document.getElementById('app');
   var status = document.getElementById('save-status');
   function flash(msg, bad) { status.textContent = msg; status.style.color = bad ? 'var(--bad)' : 'var(--ok)'; }
-  document.getElementById('toggle-edit').addEventListener('click', function () { app.classList.toggle('editing'); });
+  // Triage edits reload the page (the queue, sort order and Jev marks all change),
+  // so edit mode is remembered for the tab.
+  var EDIT_KEY = 'qa-tracker-editing';
+  try { if (sessionStorage.getItem(EDIT_KEY) === '1') app.classList.add('editing'); } catch (err) { /* storage blocked */ }
+  document.getElementById('toggle-edit').addEventListener('click', function () {
+    var on = app.classList.toggle('editing');
+    try { sessionStorage.setItem(EDIT_KEY, on ? '1' : '0'); } catch (err) { /* storage blocked */ }
+  });
   document.getElementById('export-pdf').addEventListener('click', function () { app.classList.remove('editing'); window.print(); });
   document.getElementById('toggle-theme').addEventListener('click', function () {
     var r = document.documentElement;
@@ -68,9 +79,15 @@ export function page(data, { title }) {
     }
     if (act === 'reverify') save({ kind: 'reverify', feature: row.dataset.feature, value: e.target.checked });
   });
+  var TRIAGE = { icategory: 'issue-category', icomplexity: 'issue-complexity', iseverity: 'issue-severity' };
   app.addEventListener('change', function (e) {
-    if (e.target.getAttribute('data-act') === 'istatus')
+    var act = e.target.getAttribute('data-act');
+    if (act === 'istatus')
       save({ kind: 'issue-status', issue: e.target.closest('tr').dataset.issue, value: e.target.value });
+    else if (TRIAGE[act]) {
+      var value = act === 'icomplexity' ? Number(e.target.value) : e.target.value;
+      save({ kind: TRIAGE[act], issue: e.target.closest('tr').dataset.issue, value: value }, function () { location.reload(); });
+    }
   });
 })();
 </script></body></html>`;
@@ -109,7 +126,7 @@ const json = (res, status, body) => {
  * deliberately serve the dashboard on a trusted network.
  */
 export function createServer(store, { allowAnyHost = false } = {}) {
-  const title = store.config.title;
+  const { title, categories } = store.config;
   return http.createServer(async (req, res) => {
     try {
       // DNS-rebinding guard: a hostile page that points its own name at
@@ -121,7 +138,7 @@ export function createServer(store, { allowAnyHost = false } = {}) {
       // Build each body before writing headers: a malformed YAML file throws
       // while reading, and the catch below must still be able to answer.
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
-        const html = page(store.data(), { title });
+        const html = page(store.data(), { title, categories });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }

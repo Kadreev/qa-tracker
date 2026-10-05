@@ -1,0 +1,33 @@
+# Jev judgments, append-only. Written once per assess run; never edited.
+# Illustrative: these answers are made up for the demo (model: jev-example) and
+# were not returned by TypeSafe's API.
+- id: asm-2026-01-21
+  date: 2026-01-21
+  model: jev-example
+  rubric: 1
+  issues:
+    QA-1:
+      category: { value: functional, confidence: 0.86, probabilities: { functional: 0.80, data: 0.06, error-handling: 0.05, integration: 0.02, ui-layout: 0.01, usability: 0.03, accessibility: 0.00, content: 0.00, performance: 0.00, security: 0.02, code-quality: 0.00, other: 0.01 } }
+      complexity: { value: 2, top: 0.62, score: 2.2, confidence: 0.71, probabilities: { "1": 0.18, "2": 0.62, "3": 0.12, "4": 0.04, "5": 0.02, "6": 0.01, "7": 0.01, "8": 0.00, "9": 0.00, "10": 0.00 } }
+      severity: { value: medium, confidence: 0.91, probabilities: { critical: 0.01, high: 0.06, medium: 0.91, low: 0.02 } }
+      applied: [category, complexity]
+    QA-2:
+      category: { value: functional, confidence: 0.79, probabilities: { functional: 0.74, data: 0.08, error-handling: 0.02, integration: 0.00, ui-layout: 0.09, usability: 0.03, accessibility: 0.00, content: 0.00, performance: 0.01, security: 0.00, code-quality: 0.01, other: 0.02 } }
+      complexity: { value: 4, top: 0.52, score: 4.1, confidence: 0.64, probabilities: { "1": 0.01, "2": 0.04, "3": 0.18, "4": 0.52, "5": 0.17, "6": 0.06, "7": 0.02, "8": 0.00, "9": 0.00, "10": 0.00 } }
+      severity: { value: high, confidence: 0.87, probabilities: { critical: 0.05, high: 0.87, medium: 0.07, low: 0.01 } }
+      applied: [complexity]
+    QA-3:
+      category: { value: accessibility, confidence: 0.93, probabilities: { functional: 0.00, data: 0.00, error-handling: 0.00, integration: 0.00, ui-layout: 0.03, usability: 0.06, accessibility: 0.90, content: 0.00, performance: 0.00, security: 0.00, code-quality: 0.00, other: 0.01 } }
+      complexity: { value: 3, top: 0.30, score: 3.0, confidence: 0.31, probabilities: { "1": 0.12, "2": 0.26, "3": 0.30, "4": 0.18, "5": 0.08, "6": 0.04, "7": 0.02, "8": 0.00, "9": 0.00, "10": 0.00 } }
+      severity: { value: low, confidence: 0.80, probabilities: { critical: 0.00, high: 0.03, medium: 0.17, low: 0.80 } }
+      applied: [category]
+    QA-4:
+      category: { value: error-handling, confidence: 0.79, probabilities: { functional: 0.12, data: 0.08, error-handling: 0.73, integration: 0.01, ui-layout: 0.00, usability: 0.02, accessibility: 0.00, content: 0.00, performance: 0.02, security: 0.00, code-quality: 0.01, other: 0.01 } }
+      complexity: { value: 6, top: 0.58, score: 5.6, confidence: 0.60, probabilities: { "1": 0.00, "2": 0.02, "3": 0.06, "4": 0.09, "5": 0.14, "6": 0.58, "7": 0.08, "8": 0.03, "9": 0.00, "10": 0.00 } }
+      severity: { value: critical, confidence: 0.93, probabilities: { critical: 0.93, high: 0.05, medium: 0.02, low: 0.00 } }
+      applied: [category, severity]
+    QA-5:
+      category: { value: content, confidence: 0.76, probabilities: { functional: 0.03, data: 0.00, error-handling: 0.09, integration: 0.00, ui-layout: 0.01, usability: 0.17, accessibility: 0.00, content: 0.68, performance: 0.00, security: 0.00, code-quality: 0.00, other: 0.02 } }
+      complexity: { value: 1, top: 0.68, score: 1.5, confidence: 0.80, probabilities: { "1": 0.68, "2": 0.22, "3": 0.07, "4": 0.03, "5": 0.00, "6": 0.00, "7": 0.00, "8": 0.00, "9": 0.00, "10": 0.00 } }
+      severity: { value: medium, confidence: 0.72, probabilities: { critical: 0.02, high: 0.18, medium: 0.72, low: 0.08 } }
+      applied: [category, complexity]

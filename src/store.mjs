@@ -6,7 +6,7 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync, renameSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { parse, parseDocument, isSeq, isMap } from 'yaml';
-import { validate } from './validate.mjs';
+import { validate, validateAll, isLogWarning } from './validate.mjs';
 import { applyChange } from './edit.mjs';
 import { renderMarkdown } from './markdown.mjs';
 import { loadSurfaceFiles, renderSurfaces, surfaceFile } from './surfaces.mjs';
@@ -14,7 +14,7 @@ import { SURFACE_VERDICTS } from './schema.mjs';
 
 /** The tools write with lineWidth 0 so a one-field edit is a one-line diff. */
 export const YAML_OUT = { lineWidth: 0 };
-const ENTITIES = ['features', 'issues', 'runs'];
+const ENTITIES = ['features', 'issues', 'runs', 'assessments'];
 
 const readText = file => (existsSync(file) ? readFileSync(file, 'utf8') : '');
 
@@ -45,27 +45,38 @@ export function createStore(cfg) {
     surfaces: loadSurfaceFiles(files.surfacesDir),
   });
 
-  const check = d => validate(d, { exists });
+  const checkOpts = { exists, categories: cfg.categories };
+  const errorsOf = d => validate(d, checkOpts);
+
+  /** The STATUS.md text for `d`: one input for the file and for `status`, so they never differ. */
+  function renderStatus(d = data()) {
+    const warnings = validateAll(d, checkOpts).warnings.filter(w => !isLogWarning(w));
+    return renderMarkdown(d, { title: cfg.title, categories: cfg.categories, warnings });
+  }
 
   function writeStatus(d = data()) {
-    writeAtomic(files.status, renderMarkdown(d, { title: cfg.title }));
+    writeAtomic(files.status, renderStatus(d));
     if (d.surfaces.length)
       writeAtomic(files.surfaces, renderSurfaces(d.surfaces, { features: d.features, title: `${cfg.title} — UI surfaces` }));
     else rmSync(files.surfaces, { force: true }); // generated; stale once the last surfaces file is gone
   }
 
-  /** Apply one change, validate the would-be dataset, then write. → { ok, id? } | { ok:false, error } */
+  /**
+   * Apply one change, validate the would-be dataset, then write only the files
+   * it changed (a missing assessments.yaml stays missing unless the change adds one).
+   * → { ok, id?, …extra results such as applied/dropped } | { ok:false, error }
+   */
   function commit(change, opts) {
     const docs = readDocs();
     const before = Object.fromEntries(ENTITIES.map(k => [k, docs[k].toString(YAML_OUT)]));
-    const applied = applyChange(docs, change, opts);
+    const applied = applyChange(docs, change, { ...opts, categories: cfg.categories });
     if (!applied.ok) return applied;
 
     const next = {
       ...Object.fromEntries(ENTITIES.map(k => [k, asList(docs[k].toJS())])),
       surfaces: loadSurfaceFiles(files.surfacesDir),
     };
-    const errs = check(next);
+    const errs = errorsOf(next);
     if (errs.length) return { ok: false, error: 'validation failed: ' + errs.join('; ') };
 
     for (const k of ENTITIES) {
@@ -73,7 +84,8 @@ export function createStore(cfg) {
       if (out !== before[k]) writeAtomic(files[k], out);
     }
     writeStatus(next);
-    return { ok: true, id: applied.id };
+    const { touched, ...result } = applied; // touched is internal; applied/dropped etc. are for the caller
+    return { ok: true, id: applied.id, ...result };
   }
 
   /**
@@ -103,7 +115,7 @@ export function createStore(cfg) {
       // Validate against the would-be state before touching disk.
       const d = data();
       d.surfaces[d.surfaces.findIndex(s => s.file === file)] = surfaceFile(file, doc.toJS());
-      const errs = check(d);
+      const errs = errorsOf(d);
       if (errs.length) return { ok: false, error: 'validation failed: ' + errs.join('; ') };
 
       writeAtomic(full, doc.toString(YAML_OUT));
@@ -113,7 +125,7 @@ export function createStore(cfg) {
     return { ok: false, error: `unknown surface: ${id}` };
   }
 
-  return { config: cfg, data, readDocs, validate: () => check(data()), writeStatus, commit, setVerdict };
+  return { config: cfg, data, readDocs, validate: () => errorsOf(data()), check: () => validateAll(data(), checkOpts), renderStatus, writeStatus, commit, setVerdict };
 }
 
 function findSurface(seq, id) {

@@ -9,8 +9,9 @@ import path from 'node:path';
 import {
   LEVELS, LEVEL_MEANING, DIMS, DIM_STATUS, SEVERITIES, ISSUE_TYPES, ISSUE_STATUS,
   BLAST_RADIUS, MATRIX_COLUMNS, FEATURE_FIELDS, ISSUE_FIELDS, RUN_FIELDS,
-  targetLevelForWeight,
+  targetLevelForWeight, COMPLEXITY_LEVELS, TRIAGE_FIELDS, TRIAGE_SOURCES, ASSESSMENT_FIELDS, ASSESSMENT_ID,
 } from '../src/schema.mjs';
+import { DEFAULT_CATEGORIES } from '../src/categories.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const doc = readFileSync(path.join(repo, 'docs', 'SCHEMA.md'), 'utf8');
@@ -55,4 +56,21 @@ test('every entity field spec names a type', () => {
 test('target level derives from weight as documented', () => {
   assert.deepEqual([5, 4, 3, 2, 1].map(targetLevelForWeight), ['L4', 'L4', 'L3', 'L2', 'L2']);
   assert.match(doc, /4–5 → L4, 3 → L3, 1–2 → L2/);
+});
+
+test('every default category and complexity level is documented in SCHEMA.md', () => {
+  assert.equal(COMPLEXITY_LEVELS.length, 10);
+  for (const c of DEFAULT_CATEGORIES) assert.ok(doc.includes(`\`${c.name}\``), `SCHEMA.md does not mention category "${c.name}"`);
+  COMPLEXITY_LEVELS.forEach((text, i) =>
+    assert.ok(doc.includes(`| ${i + 1} | ${text} |`), `SCHEMA.md has no complexity row for level ${i + 1}`));
+});
+
+test('the triage fields, sources and assessment fields are documented', () => {
+  for (const name of ['details', 'category', 'complexity', 'triage'])
+    assert.ok(name in ISSUE_FIELDS, `ISSUE_FIELDS lacks ${name}`);
+  for (const name of [...Object.keys(ISSUE_FIELDS), ...Object.keys(ASSESSMENT_FIELDS), ...TRIAGE_FIELDS, ...TRIAGE_SOURCES])
+    assert.ok(doc.includes(`\`${name}\``), `SCHEMA.md does not mention "${name}"`);
+  assert.deepEqual(TRIAGE_FIELDS, ['severity', 'category', 'complexity']);
+  assert.equal(ISSUE_FIELDS.severity.required, false);
+  assert.ok(ASSESSMENT_ID.test('asm-2026-10-04') && ASSESSMENT_ID.test('asm-2026-10-04-2') && !ASSESSMENT_ID.test('asm-1'));
 });

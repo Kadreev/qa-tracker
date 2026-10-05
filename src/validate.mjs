@@ -1,12 +1,19 @@
-// Validates tracker data. validate(data, opts) -> array of error strings (empty = valid).
+// Validates tracker data.
+//
+//   validate(data, opts)    -> string[]                 errors only (empty = valid)
+//   validateAll(data, opts) -> { errors, warnings }     errors block writes; warnings never do
 //
 // `opts.exists(repoPath)` answers whether a path named by a surface (`component`,
 // `test_refs`) exists; the store passes one rooted at the configured repo root.
+// `opts.categories` is the resolved category list in effect (default: the built-in one).
 import {
   LEVELS, DIM_STATUS, SEVERITIES, ISSUE_TYPES, ISSUE_STATUS, DIMS, BLAST_RADIUS,
   READ_ONLY_LEVEL_CAP, FEATURE_ID, RUN_ID, DATE, LEVEL_CHANGE, RUN_REF,
+  TRIAGE_FIELDS, TRIAGE_SOURCES, ASSESSMENT_ID,
 } from './schema.mjs';
 import { validateSurfaces } from './surfaces.mjs';
+import { resolveCategories, categoryByName } from './categories.mjs';
+import { assessmentIndex, judgmentOf } from './assessments.mjs';
 
 export { RUN_REF }; // kept here too: 0.1.0 exported it from this module
 
@@ -18,24 +25,48 @@ function dupes(ids) {
 
 const blank = v => typeof v !== 'string' || !v.trim();
 const isMapping = v => v != null && typeof v === 'object' && !Array.isArray(v);
+const present = v => v !== undefined && v !== null;
+const isComplexity = v => Number.isInteger(v) && v >= 1 && v <= 10;
 
-export function validate({ features = [], issues = [], runs = [], surfaces = [] }, opts = {}) {
-  const errs = [];
-  for (const [label, list] of [['features.yaml', features], ['issues.yaml', issues], ['runs.yaml', runs]])
+/**
+ * Whether a warning is about the append-only assessments log rather than an
+ * issue. Those cannot be cleared by editing the log, so renderers that list
+ * issue warnings (STATUS.md) leave them out; `validate` and `get` print them.
+ */
+export function isLogWarning(w) {
+  return w.startsWith('assessment ') || /^issue \S+: triage /.test(w);
+}
+
+/** validate(data, opts) → string[] of errors. Warnings are not reported here; see validateAll. */
+export function validate(data, opts = {}) {
+  return run(data, opts).errs;
+}
+
+/** validateAll(data, opts) → { errors, warnings }. Warnings never block a write. */
+export function validateAll(data, opts = {}) {
+  const { errs, warns } = run(data, opts);
+  return { errors: errs, warnings: warns };
+}
+
+function run({ features = [], issues = [], runs = [], surfaces = [], assessments = [] }, opts) {
+  const { categories = resolveCategories() } = opts;
+  const errs = [], warns = [];
+  const lists = [['features.yaml', features], ['issues.yaml', issues], ['runs.yaml', runs], ['assessments.yaml', assessments]];
+  for (const [label, list] of lists)
     if (!Array.isArray(list)) errs.push(`${label} must be a YAML list`);
-  if (errs.length) return errs;
+  if (errs.length) return { errs, warns };
 
   // A bare "-" or a scalar item is reported here and left out of every later check.
-  for (const [label, list] of [['features.yaml', features], ['issues.yaml', issues], ['runs.yaml', runs]])
+  for (const [label, list] of lists)
     list.forEach((x, i) => { if (!isMapping(x)) errs.push(`${label} entry ${i + 1} must be a mapping, got ${JSON.stringify(x)}`); });
-  [features, issues, runs] = [features, issues, runs].map(list => list.filter(isMapping));
+  [features, issues, runs, assessments] = [features, issues, runs, assessments].map(list => list.filter(isMapping));
 
   const featIds = new Set(features.map(f => f.id));
   const issueIds = new Set(issues.map(i => i.id));
   const runIds = new Set(runs.map(r => r.id));
   const runRadius = new Map(runs.map(r => [r.id, r.blast_radius]));
 
-  for (const [label, list] of [['feature', features], ['issue', issues], ['run', runs]])
+  for (const [label, list] of [['feature', features], ['issue', issues], ['run', runs], ['assessment', assessments]])
     for (const d of dupes(list.map(x => x.id)))
       errs.push(`duplicate ${label} id: ${d}`);
 
@@ -60,14 +91,92 @@ export function validate({ features = [], issues = [], runs = [], surfaces = [] 
       errs.push(`${at}: last_validated references unknown run ${runRef}`);
   }
 
+  // A category that is not in the list is drift, not corruption: warn, never block.
+  function checkCategory(i, at) {
+    if (!present(i.category)) return;
+    if (typeof i.category !== 'string' || !FEATURE_ID.test(i.category)) {
+      errs.push(`${at}: category must be kebab-case, got ${JSON.stringify(i.category)}`);
+      return;
+    }
+    const cat = categoryByName(categories, i.category);
+    if (!cat) warns.push(`${at}: category ${i.category} is not in the category list`);
+    else if (cat.type && ISSUE_TYPES.includes(i.type) && i.type !== cat.type)
+      errs.push(`${at}: type must be ${cat.type} for category ${cat.name}, got ${i.type}`);
+  }
+
+  // Provenance shape is an error; what a reference points at is only ever a warning.
+  function checkTriage(i, at) {
+    if (!present(i.triage)) return;
+    if (!isMapping(i.triage)) { errs.push(`${at}: triage must be a mapping`); return; }
+    for (const [field, entry] of Object.entries(i.triage)) {
+      const t = `${at}: triage.${field}`;
+      if (!TRIAGE_FIELDS.includes(field)) { errs.push(`${t}: unknown triage field (use ${TRIAGE_FIELDS.join(', ')})`); continue; }
+      if (!isMapping(entry)) { errs.push(`${t} must be a mapping`); continue; }
+      if (!TRIAGE_SOURCES.includes(entry.source)) { errs.push(`${t}: source must be jev or set`); continue; }
+      const ref = entry.source === 'jev' ? entry.assessment : entry.seen;
+      if (entry.source === 'jev' && typeof ref !== 'string') { errs.push(`${t}: source jev needs an assessment id`); continue; }
+      if (entry.source === 'set' && present(ref) && typeof ref !== 'string') { errs.push(`${t}: seen must be a string`); continue; }
+      if (typeof ref !== 'string') continue;
+
+      const logAt = `${at}: triage ${field}`;
+      const idx = assessmentIndex(assessments, ref);
+      if (idx < 0) { warns.push(`${logAt}: assessment ${ref} does not exist`); continue; }
+      if (!isMapping(assessments[idx].issues) || !Object.hasOwn(assessments[idx].issues, i.id)) {
+        warns.push(`${logAt}: assessment ${ref} does not mention this issue`);
+        continue;
+      }
+      // A jev value that no longer matches its assessment was edited by hand (spec 2.2: treated as explicit).
+      const said = judgmentOf(assessments, ref, i.id, field);
+      if (entry.source === 'jev' && said && present(i[field]) && said.value !== i[field])
+        warns.push(`${at}: ${field} ${i[field]} differs from what assessment ${ref} said (${said.value}); treated as set by hand`);
+    }
+  }
+
   for (const i of issues) {
     const at = `issue ${i.id}`;
     if (blank(i.id)) errs.push(`${at}: id is required`);
     if (blank(i.title)) errs.push(`${at}: title is required`);
-    if (!SEVERITIES.includes(i.severity)) errs.push(`${at}: severity invalid: ${i.severity}`);
+    if (present(i.severity) && !SEVERITIES.includes(i.severity)) errs.push(`${at}: severity invalid: ${i.severity}`);
     if (!ISSUE_TYPES.includes(i.type)) errs.push(`${at}: type invalid: ${i.type}`);
     if (!ISSUE_STATUS.includes(i.status)) errs.push(`${at}: status invalid: ${i.status}`);
     if (!featIds.has(i.feature)) errs.push(`${at}: unknown feature ref ${i.feature}`);
+    if (present(i.details) && typeof i.details !== 'string') errs.push(`${at}: details must be a string`);
+    if (present(i.complexity) && !isComplexity(i.complexity))
+      errs.push(`${at}: complexity must be an integer 1-10, got ${JSON.stringify(i.complexity)}`);
+    checkCategory(i, at);
+    checkTriage(i, at);
+  }
+
+  function checkJudgments(j, at) {
+    for (const field of TRIAGE_FIELDS) {
+      if (!present(j[field])) continue;
+      if (!isMapping(j[field])) { errs.push(`${at}.${field} must be a mapping`); continue; }
+      const { value, confidence } = j[field];
+      if (typeof confidence !== 'number' || !(confidence >= 0 && confidence <= 1))
+        errs.push(`${at}: ${field}.confidence must be a number from 0 to 1, got ${JSON.stringify(confidence)}`);
+      if (field === 'complexity' && !isComplexity(value))
+        errs.push(`${at}: complexity.value must be an integer 1-10, got ${JSON.stringify(value)}`);
+      if (field === 'severity' && !SEVERITIES.includes(value)) errs.push(`${at}: severity.value invalid: ${value}`);
+    }
+    if (!present(j.applied)) return;
+    if (!Array.isArray(j.applied)) errs.push(`${at}: applied must be a list`);
+    else for (const f of j.applied)
+      if (!TRIAGE_FIELDS.includes(f)) errs.push(`${at}: applied has unknown field ${f}`);
+  }
+
+  // assessments.yaml: shape errors block; naming a missing issue is a log warning.
+  for (const a of assessments) {
+    const at = `assessment ${a.id}`;
+    if (typeof a.id !== 'string' || !ASSESSMENT_ID.test(a.id)) errs.push(`${at}: id must look like asm-YYYY-MM-DD[-n]`);
+    if (!DATE.test(String(a.date ?? ''))) errs.push(`${at}: date must be YYYY-MM-DD, got ${a.date}`);
+    if (blank(a.model)) errs.push(`${at}: model is required`);
+    if (!Number.isInteger(a.rubric) || a.rubric < 1) errs.push(`${at}: rubric must be a positive integer, got ${JSON.stringify(a.rubric)}`);
+    if (!isMapping(a.issues)) { errs.push(`${at}: issues must be a mapping of issue id to judgments`); continue; }
+    for (const [iid, j] of Object.entries(a.issues)) {
+      if (!issueIds.has(iid)) warns.push(`${at}: issue ${iid} does not exist`);
+      if (!isMapping(j)) { errs.push(`${at}: issues.${iid} must be a mapping`); continue; }
+      checkJudgments(j, `${at}: issues.${iid}`);
+    }
   }
 
   const cap = LEVELS.indexOf(READ_ONLY_LEVEL_CAP);
@@ -115,5 +224,5 @@ export function validate({ features = [], issues = [], runs = [], surfaces = [] 
       errs.push(`issue ${i.id}: status verified-fixed but no run lists it in issues_verified; record it with add-run --verified`);
 
   errs.push(...validateSurfaces(surfaces, { featureIds: featIds, issueIds, runIds, runRadius }, opts));
-  return errs;
+  return { errs, warns };
 }

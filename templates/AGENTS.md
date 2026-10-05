@@ -49,9 +49,11 @@ Cumulative: a feature with a failing L1 check is L0 however well L2 went.
 ## After a QA pass
 
 ```bash
-# 1. file what you found (ids default to QA-1, QA-2, …)
-npx qa-tracker add-issue --feature notes-list --severity high --type functionality \
-  --title "Deleting a pinned note leaves an empty card until reload"
+# 1. file what you found (ids default to QA-1, QA-2, …). --severity is optional:
+#    describe the problem in --details and leave the rest to triage (below)
+npx qa-tracker add-issue --feature notes-list \
+  --title "Deleting a pinned note leaves an empty card until reload" \
+  --details "Pin a note, delete it from the list: the card stays, empty, until reload."
 
 # 2. record the run — it is the evidence, and it applies the level changes
 npx qa-tracker add-run --blast-radius sandbox --profiles bug-hunter \
@@ -74,6 +76,35 @@ to `fixed` and the feature's `reverify` to `true`, so the next plan re-checks it
 npx qa-tracker set QA-2 status fixed
 npx qa-tracker set notes-list reverify true
 ```
+
+## Triage
+
+Every issue has three triage fields: `severity` (impact: critical → low),
+`complexity` (effort to fix, 1–10) and `category` (what kind of defect). `status`
+is the lifecycle, a separate thing. You may pass any of them to `add-issue`
+(`--severity`, `--complexity`, `--category`); a value you give is explicit and is
+never overwritten.
+
+Leave out what you are unsure of. Anything missing lands in the **triage queue**:
+
+```bash
+npx qa-tracker triage            # or --json: open issues needing a decision
+npx qa-tracker set QA-7 category accessibility
+npx qa-tracker set QA-7 complexity 2
+npx qa-tracker set QA-7 severity medium
+```
+
+- `needs-triage`: a value is missing (or the category is not in the list). Decide
+  it from the issue and `set` it.
+- `disagrees`: a value that was set on purpose differs from a confident Jev
+  suggestion. Decide which is right and `set` the value (even the same one); that
+  records that you reviewed it and clears the item.
+
+If a TypeSafe key is configured, `npx qa-tracker assess` asks Jev first and fills
+the confident answers; `triage` then shows only what is left. It sends the issue
+title and `details`, so never put secrets or customer data in `--details`. A value
+marked `ᴶ` in `STATUS.md` is a model's judgment that nobody has confirmed.
+`npx qa-tracker get QA-7` shows where each value came from.
 
 ## Planning the next run
 

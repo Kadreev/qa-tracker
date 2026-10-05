@@ -28,7 +28,10 @@ YAML; the CLI validates every write.
 ## After a QA pass
 
 ```bash
-npx qa-tracker add-issue --feature <id> --severity <critical|high|medium|low> --title "…"
+npx qa-tracker add-issue --feature <id> --title "…" --details "what happens, steps" \
+  [--severity <critical|high|medium|low>] [--category <name>] [--complexity 1-10]
+npx qa-tracker triage                  # open issues still needing a decision
+npx qa-tracker set <issue> <category|complexity|severity> <value>   # resolve one
 npx qa-tracker add-run --blast-radius <read-only|sandbox|test-account> \
   --features a,b --levels a=L3 --opened QA-7 --verified QA-2 --profiles <who>
 npx qa-tracker set <feature> <functionality|usability|code_health> <pass|issues|unknown>
@@ -37,6 +40,17 @@ npx qa-tracker validate
 ```
 
 After a fix ships: `set <issue> status fixed` and `set <feature> reverify true`.
+
+## Triage
+
+`--severity` is optional. Severity is impact, complexity is effort to fix, status
+is lifecycle. File the finding with `--details`, run `triage`, and `set` each item:
+`needs-triage` is a missing value, `disagrees` is an explicit value that a
+confident Jev answer contradicts; `set` (even to the same value) clears it. A
+value you set is never overwritten by Jev. With `TYPESAFE_API_KEY` configured,
+`assess` fills the confident answers first, but it sends the title and `details`
+to TypeSafe, so keep secrets out of `--details`. `ᴶ` marks an unconfirmed model
+judgment.
 
 ## Red flags — stop
 

@@ -2,12 +2,21 @@
 
 _Last run: run-2026-01-20 (2026-01-20, sandbox) · 6 features · 3 open issues · 2 closed issues._
 
+## Summary
+- **Open issues:** 3 — critical 1 · high 0 · medium 1 · low 1 · unrated 0
+- **Fixed:** 2 of 5 (40%) — 1 verified · 1 awaiting check
+- **Coverage:** 1 of 6 features at target · weighted 49%
+- **Hotspot:** Note editor (`note-editor`) — QA-4 (critical), score 8
+- **Quick wins:** 2 open issues with complexity ≤ 3
+- **Triage queue:** 2 items
+
 > Generated from the YAML files next to this one — do not edit by hand; run `qa-tracker render`.
 
 ## Legend
 - **W** — weight (priority/risk, 1–5). Higher ⇒ must be validated deeper.
 - **Cur / Tgt** — validation level reached / target. Ladder (cumulative, highest passed): **L0** Renders · **L1** Read validated · **L2** Interactions · **L3** CRUD · **L4** Hardened.
 - **Func / UX / Code** — functionality / usability / code-health: ✅ pass · ⚠️ has issues · ❔ unknown.
+- **Severity** = impact on users (critical → low) · **Complexity** = effort to fix, 1–10 · **Status** = lifecycle (open → fixed → verified-fixed, or wont-fix) · ᴶ = set by Jev, not yet confirmed.
 
 ## Coverage matrix
 | Feature | Area | W | Cur | Tgt | Func | UX | Code | Issues |
@@ -20,17 +29,23 @@ _Last run: run-2026-01-20 (2026-01-20, sandbox) · 6 features · 3 open issues �
 | Account settings | Settings | 2 | L2 | L2 | ✅ | ✅ | ✅ | — |
 
 ## Open issues (by severity)
-| ID | Severity | Type | Feature | Title | Status |
-|---|---|---|---|---|---|
-| QA-4 | critical | functionality | note-editor | Autosave drops the last 2 seconds of typing when the tab is closed | open |
-| QA-5 | medium | usability | search | No-results state says "Error" instead of explaining there were no matches | open |
-| QA-3 | low | usability | notes-list | Sort menu has no keyboard focus ring | open |
+| ID | Severity | Category | Cx | Feature | Title | Status |
+|---|---|---|---|---|---|---|
+| QA-4 | criticalᴶ | error-handlingᴶ | 3 | note-editor | Autosave drops the last 2 seconds of typing when the tab is closed | open |
+| QA-5 | medium | contentᴶ | 1ᴶ | search | No-results state says "Error" instead of explaining there were no matches | open |
+| QA-3 | low | accessibilityᴶ | — | notes-list | Sort menu has no keyboard focus ring | open |
 
 ## Closed issues
-| ID | Severity | Type | Feature | Title | Status |
-|---|---|---|---|---|---|
-| QA-2 | high | functionality | notes-list | Deleting a pinned note leaves an empty card until reload | fixed |
-| QA-1 | medium | functionality | sign-in | Sign-up form accepts an e-mail with a trailing space and then cannot sign in | verified-fixed |
+| ID | Severity | Category | Cx | Feature | Title | Status |
+|---|---|---|---|---|---|---|
+| QA-2 | high | functional | 4ᴶ | notes-list | Deleting a pinned note leaves an empty card until reload | fixed |
+| QA-1 | medium | functionalᴶ | 2ᴶ | sign-in | Sign-up form accepts an e-mail with a trailing space and then cannot sign in | verified-fixed |
+
+## Triage queue
+| Issue | Field | Kind | Current | Suggested | Confidence | Reason |
+|---|---|---|---|---|---|---|
+| QA-3 | complexity | needs-triage | — | 3 | 30% | low confidence (30%) |
+| QA-4 | complexity | disagrees | 3 | 6 | 58% | Jev suggests 6 (58%) |
 
 ## UI surfaces (see `SURFACES.md` for the nested checklist)
 _7 surfaces · ✅ 3 · ❌ 1 · ⛔ 1 · ⬜ 2 never checked._

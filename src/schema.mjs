@@ -30,6 +30,28 @@ export const SEVERITIES = ['critical', 'high', 'medium', 'low'];
 export const ISSUE_TYPES = ['code', 'functionality', 'usability'];
 export const ISSUE_STATUS = ['open', 'fixed', 'verified-fixed', 'wont-fix'];
 
+/**
+ * Triage: the three issue fields Jev can judge, in queue order. `TRIAGE_SOURCES`
+ * says where a value came from: `jev` (applied from an assessment) or `set`
+ * (put there on purpose by a person or an agent).
+ */
+export const TRIAGE_FIELDS = ['severity', 'category', 'complexity'];
+export const TRIAGE_SOURCES = ['jev', 'set'];
+
+/** Complexity = effort to fix. Index 0 is level 1. Also the Jev score criteria. */
+export const COMPLEXITY_LEVELS = [
+  'A copy, style or configuration value changes in one place; no logic changes.',
+  'A one-line logic fix in one file, with an obvious cause.',
+  'A small change inside one component or function; the fix is clear and an existing test can be adjusted.',
+  'A change across two or three files in one module, with a new test.',
+  'Several files, or one tricky piece of logic (state, async, edge cases), with new tests.',
+  'The cause has to be investigated first, or the fix touches shared code other features depend on.',
+  'The fix crosses layers (frontend and backend, or several modules) and needs some design and coordinated tests.',
+  'A data model, API contract or widely used shared component changes, and its callers must be updated.',
+  'A subsystem is redesigned or a dependency replaced: several days of work with real regression risk.',
+  'A cross-system redesign or a migration of existing user data.',
+];
+
 /** How far a QA run is allowed to go. Read-only runs cap the ladder at L2. */
 export const BLAST_RADIUS = ['read-only', 'sandbox', 'test-account'];
 export const READ_ONLY_LEVEL_CAP = 'L2';
@@ -44,6 +66,8 @@ export function targetLevelForWeight(weight) {
 /** Ids: features are kebab-case; runs are run-YYYY-MM-DD with an optional suffix. */
 export const FEATURE_ID = /^[a-z0-9][a-z0-9-]*$/;
 export const RUN_ID = /^run-\d{4}-\d{2}-\d{2}(-[\w-]+)?$/;
+/** Assessment ids in assessments.yaml: asm-YYYY-MM-DD, then -2, -3 … for later runs that day. */
+export const ASSESSMENT_ID = /^asm-\d{4}-\d{2}-\d{2}(-\d+)?$/;
 export const DATE = /^\d{4}-\d{2}-\d{2}$/;
 /** A level change in runs.yaml: "L0->L2". */
 export const LEVEL_CHANGE = /^(L[0-4])->(L[0-4])$/;
@@ -86,11 +110,23 @@ export const FEATURE_FIELDS = {
 export const ISSUE_FIELDS = {
   id: { type: 'string', required: true, note: 'unique and permanent; reuse the id your issue tracker gives the finding' },
   title: { type: 'string', required: true },
-  severity: { type: SEVERITIES.join('|'), required: true },
+  details: { type: 'string', required: false, note: 'what happens and how to reproduce; sent to Jev' },
+  severity: { type: SEVERITIES.join('|'), required: false, note: 'impact on users; Jev may fill it' },
+  category: { type: 'kebab-case string', required: false, note: 'kind of defect; should be in the category list' },
   type: { type: ISSUE_TYPES.join('|'), required: true },
+  complexity: { type: 'integer 1-10', required: false, note: 'effort to fix' },
   feature: { type: 'feature id', required: true },
   status: { type: ISSUE_STATUS.join('|'), required: true },
+  triage: { type: '{severity,category,complexity: {source: jev|set, assessment|seen}}', required: false, note: 'where each triage value came from' },
   source: { type: 'path or url', required: false, note: 'the report or record that raised it' },
+};
+
+export const ASSESSMENT_FIELDS = {
+  id: { type: 'asm-YYYY-MM-DD[-n]', required: true },
+  date: { type: 'YYYY-MM-DD', required: true },
+  model: { type: 'string', required: true, note: 'exactly as the API returned it' },
+  rubric: { type: 'positive integer', required: true, note: 'RUBRIC_VERSION of the question text' },
+  issues: { type: '{issue id: {category,complexity,severity,applied}}', required: true },
 };
 
 export const RUN_FIELDS = {
