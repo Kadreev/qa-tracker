@@ -114,6 +114,18 @@ npx qa-tracker verdict notes.list.sort broken --run run-2026-01-20 --issues QA-3
 npx qa-tracker verdict notes.list.empty blocked --run run-2026-01-20 --notes "needs a fresh account"
 ```
 
+- For agents fixing findings, `qa-tracker next` returns the open issue to work on
+  now: the top of the dashboard's open-issues table (severity, then complexity).
+  Record what you did with `note`, then re-status it; the dashboard someone is
+  watching follows these writes on its own:
+
+```bash
+npx qa-tracker next                          # the top open issue, with its source
+npx qa-tracker note QA-3 Fixed in abc123: totals now sum every row
+npx qa-tracker set QA-3 status fixed         # verified-fixed comes from a later run
+npx qa-tracker issues --severity high        # the queue behind it, same order
+```
+
 Everything has a `--json` mode, and every command exits non-zero on rejection.
 
 ## Triage with Jev
@@ -238,11 +250,14 @@ Confirm or correct it with `set <issue> <field> <value>` when it matters.
 | `add-feature <id> --name --area [--weight] [--target] [--routes a,b]` | New matrix row at L0 |
 | `add-issue --feature --title [--severity] [--details] [--category] [--complexity] [--type] [--id] [--source] [--assess\|--no-assess]` | New finding (ids default to `QA-n`), linked from its feature; without `--severity` it joins the triage queue |
 | `triage [--json]` | The triage queue: open issues with a missing value, or a Jev answer that disagrees with an explicit one |
+| `issues [--status open\|fixed\|verified-fixed\|wont-fix\|closed\|all] [--severity] [--feature] [--category] [--json]` | Issues in the dashboard's order (open: severity, then complexity; unset last); default open |
+| `next [--severity] [--feature] [--category] [--json]` | The open issue to work on now: the top of that order, with its details and source |
 | `assess [ids…] [--all] [--refresh] [--dry-run] [--json]` | Ask Jev for category, complexity and severity; apply confident answers, queue the rest. Needs `TYPESAFE_API_KEY` unless `--dry-run` (see [Triage with Jev](#triage-with-jev)) |
 | `add-run --blast-radius [--levels f=L2,g=L3] [--features] [--opened] [--verified] [--profiles] [--report]` | Record a run and apply it: levels, `last_validated`, `verified-fixed` |
 | `set <feature> weight\|target\|reverify\|functionality\|usability\|code_health <value>` | Edit a feature field |
 | `set <issue> status <open\|fixed\|wont-fix>` | Re-status a finding (`verified-fixed` comes only from `add-run --verified`) |
 | `set <issue> category\|complexity\|severity\|details <value>` | Record an explicit value (confirms or overrides Jev) |
+| `note <issue> <text…> [--file <path>] [--date YYYY-MM-DD]` | Append a dated paragraph to an issue's details; the words need no quoting, and `--file` reads the text from a file |
 | `surfaces [--json]`, `surface <id>` | The UI checklist |
 | `verdict <surface> <pass\|broken\|blocked\|unchecked> --run <id> [--issues] [--notes]` | Record a surface verdict |
 | `render` | Regenerate `STATUS.md` / `SURFACES.md` |
@@ -299,6 +314,12 @@ severity (recorded as explicit values, like `set`). A "Triage queue" lists what
 still needs a person. The server never contacts TypeSafe. Each edit is
 validated and written straight back to the YAML, keeping comments and
 formatting. **Export PDF** uses the browser's print dialog.
+
+**Live.** The open page checks every few seconds whether the data files changed
+(`GET /api/version`) and reloads when the CLI or an agent wrote to them, so you
+can leave it open and watch work land. While you are in Edit mode or a field has
+focus it only says the data changed, and reloads nothing. `serve` reads
+`qa-tracker.config.json` once at start: restart it after changing the config.
 
 **Summary.** Above the coverage matrix sit four cards and three panels, all
 computed from the same data as the `## Summary` block at the top of `STATUS.md`:

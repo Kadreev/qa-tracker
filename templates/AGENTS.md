@@ -14,6 +14,8 @@ It is plain YAML plus a CLI, so you can read and update it without a browser.
 npx qa-tracker status            # the snapshot
 npx qa-tracker plan --json       # what to validate next, ranked
 npx qa-tracker get <id> --json   # one feature, issue or run
+npx qa-tracker next --json       # the open issue to fix now (dashboard order)
+npx qa-tracker issues            # every open issue, in that order
 npx qa-tracker surfaces --json   # every surface, flat, with its `expected` text
 ```
 
@@ -76,6 +78,23 @@ to `fixed` and the feature's `reverify` to `true`, so the next plan re-checks it
 npx qa-tracker set QA-2 status fixed
 npx qa-tracker set notes-list reverify true
 ```
+
+## Fixing findings
+
+Work the open issues in the order the dashboard shows them: severity, then
+complexity. `next` always returns the top one, so a person watching the
+dashboard sees you take its rows from the top. Do not pick issues by another
+ordering unless asked.
+
+```bash
+npx qa-tracker next                                  # read its details and source first
+# … fix it, with a test that failed before the fix …
+npx qa-tracker note QA-7 Fixed in abc123: the total now counts paused rows
+npx qa-tracker set QA-7 status fixed                 # verified-fixed needs a later run
+```
+
+`note` appends one dated paragraph to the issue's details; the words need no
+quoting, and `--file <path>` reads longer text from a file.
 
 ## Triage
 

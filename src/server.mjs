@@ -6,6 +6,8 @@
 // same-origin and addressed to a loopback Host — a page on another site cannot
 // write to your tracker through your browser.
 import http from 'node:http';
+import { existsSync, readdirSync, statSync } from 'node:fs';
+import path from 'node:path';
 import { STYLE, renderContent, esc } from './dashboard.mjs';
 
 /** Change kinds the browser may send. Adding entities stays a CLI/agent action. */
@@ -16,14 +18,33 @@ export const BROWSER_KINDS = [
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 const hostname = host => String(host ?? '').replace(/:\d+$/, '').toLowerCase();
 
+/**
+ * dataVersion(files) → a string that changes whenever a data file does (size and
+ * mtime of the YAML files and every surfaces file). The open page polls it so a
+ * dashboard someone is watching follows CLI and agent writes.
+ *
+ * The config file is left out on purpose: `serve` reads qa-tracker.config.json
+ * once at start, so a reload could not show a changed title or category list.
+ * Restart `serve` after editing the config.
+ */
+export function dataVersion(files) {
+  const stamp = f => {
+    try { const s = statSync(f); return `${s.size}:${s.mtimeMs}`; } catch { return '-'; }
+  };
+  const surfaceFiles = existsSync(files.surfacesDir)
+    ? readdirSync(files.surfacesDir).sort().map(n => path.join(files.surfacesDir, n))
+    : [];
+  return [files.features, files.issues, files.runs, files.assessments, ...surfaceFiles].map(stamp).join('|');
+}
+
 /** The full HTML page: toolbar, content and the edit script. */
-export function page(data, { title, categories }) {
+export function page(data, { title, categories, version = '' }) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2316a34a'/%3E%3Cpath d='M4 8.5l2.5 2.5L12 5.5' stroke='white' stroke-width='2' fill='none'/%3E%3C/svg%3E">
 <style>${STYLE}</style></head>
-<body><main id="app">
+<body><main id="app" data-version="${esc(version)}">
   <div id="toolbar">
     <button id="toggle-edit">✏️ Edit mode</button>
     <button id="export-pdf">⬇ Export PDF</button>
@@ -52,17 +73,46 @@ export function page(data, { title, categories }) {
     var dark = r.getAttribute('data-theme') ? r.getAttribute('data-theme') === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
     r.setAttribute('data-theme', dark ? 'light' : 'dark');
   });
+  // The data version this page was rendered from (see dataVersion on the server).
+  var version = app.getAttribute('data-version');
+  // A save from this page is not an outside change. The edit response carries
+  // the data version just before and just after the server applied it: if the
+  // "before" one is not ours, something else wrote in between, so the page is
+  // stale and must not adopt the new version as its own.
+  function syncVersion(j) {
+    if (!j || !j.version) return;
+    if (j.previousVersion && j.previousVersion !== version) {
+      if (busy()) flash('Data changed on disk; reload to see it');
+      else location.reload();
+      return;
+    }
+    version = j.version;
+  }
   function save(change, onOk, onDone) {
     flash('Saving…');
     fetch('/api/edit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(change) })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (res) {
-        if (res.ok && res.j.ok) { flash('Saved ✓'); if (onOk) onOk(); }
+        if (res.ok && res.j.ok) { flash('Saved ✓'); syncVersion(res.j); if (onOk) onOk(); }
         else { flash((res.j && res.j.error) || 'Rejected', true); setTimeout(function () { location.reload(); }, 1500); }
       })
       .catch(function () { flash('Network error', true); })
       .then(function () { if (onDone) onDone(); });
   }
+  // Follow writes made outside this page (the CLI, an agent): poll the data
+  // version and reload when it changes, unless someone is editing here.
+  function busy() {
+    var el = document.activeElement;
+    return app.classList.contains('editing') || (el && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName));
+  }
+  setInterval(function () {
+    if (document.hidden || !version) return;
+    fetch('/api/version').then(function (r) { return r.json(); }).then(function (j) {
+      if (!j || !j.version || j.version === version) return;
+      if (busy()) flash('Data changed on disk; reload to see it');
+      else location.reload();
+    }).catch(function () { /* server stopped; keep the page as it is */ });
+  }, 3000);
   app.addEventListener('click', function (e) {
     var act = e.target.getAttribute && e.target.getAttribute('data-act');
     if (!act) return;
@@ -138,11 +188,12 @@ export function createServer(store, { allowAnyHost = false } = {}) {
       // Build each body before writing headers: a malformed YAML file throws
       // while reading, and the catch below must still be able to answer.
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
-        const html = page(store.data(), { title, categories });
+        const html = page(store.data(), { title, categories, version: dataVersion(store.config.files) });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
       }
       if (req.method === 'GET' && url.pathname === '/api/data') return json(res, 200, store.data());
+      if (req.method === 'GET' && url.pathname === '/api/version') return json(res, 200, { version: dataVersion(store.config.files) });
       if (req.method === 'POST' && url.pathname === '/api/edit') {
         if (!String(req.headers['content-type'] ?? '').startsWith('application/json'))
           return json(res, 415, { ok: false, error: 'expected application/json' });
@@ -159,8 +210,10 @@ export function createServer(store, { allowAnyHost = false } = {}) {
           return json(res, 400, { ok: false, error: 'body must be a JSON object' });
         if (!BROWSER_KINDS.includes(change.kind))
           return json(res, 400, { ok: false, error: `change kind not allowed from the dashboard: ${change.kind}` });
+        const previousVersion = dataVersion(store.config.files);
         const result = store.commit(change);
-        return json(res, result.ok ? 200 : 400, result);
+        if (!result.ok) return json(res, 400, result);
+        return json(res, 200, { ...result, previousVersion, version: dataVersion(store.config.files) });
       }
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('not found');

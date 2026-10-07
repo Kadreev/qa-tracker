@@ -13,6 +13,8 @@ import { DIMS, LEVELS } from './schema.mjs';
 import { selectIssues, assessAndCommit, assessJson, formatAssessReport, formatAssessLine, dryRunRequests, emptyAssessResult } from './assess.mjs';
 import { triageQueue } from './triage-policy.mjs';
 import { formatTriageLine, formatLatestAssessment, latestAssessment, warningsFor } from './triage-format.mjs';
+import { listIssues, nextIssue, formatIssueLine, appendNote } from './work.mjs';
+import { readFileSync as readText } from 'node:fs';
 
 const PKG = JSON.parse(readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json'), 'utf8'));
 const BOOLEAN_FLAGS = new Set(['json', 'force', 'help', 'version', 'allow-any-host', 'all', 'refresh', 'dry-run', 'assess', 'no-assess']);
@@ -32,6 +34,12 @@ Read
   get <id> [--json]                  one feature, issue or run (an issue also shows its triage
                                      provenance, latest Jev assessment and warnings)
   triage [--json]                    issues still needing a person: missing values and Jev disagreements
+  issues [--status open|fixed|verified-fixed|wont-fix|closed|all] [--severity <s>]
+         [--feature <id>] [--category <name>] [--json]
+                                     issues in the dashboard's order (open: severity, then
+                                     complexity); default open
+  next [--severity <s>] [--feature <id>] [--category <name>] [--json]
+                                     the open issue to work on now: the top of that order
   surfaces [--json]                  the UI surface checklist (SURFACES.md) or flat JSON
   surface <id> [--json]              one surface
   validate                           check every rule; errors exit 1, warnings print and exit 0
@@ -52,6 +60,9 @@ Write (each validates the whole dataset first, then regenerates STATUS.md)
   set <issue> category|complexity|severity|details <value>
                                      an explicit value; confirms or overrides Jev's suggestion
                                      (details "" clears the details)
+  note <issue> <text…> [--file <path>] [--date YYYY-MM-DD]
+                                     append "date: text" to the issue's details as a new
+                                     paragraph (words need no quoting; --file reads the text)
   verdict <surface> <pass|broken|blocked|unchecked> --run <run-id> [--issues a,b] [--notes <text>]
   render                             rewrite STATUS.md (and SURFACES.md)
 
@@ -95,6 +106,10 @@ export function parseArgs(argv) {
 }
 
 const list = v => (typeof v === 'string' ? v.split(',').map(s => s.trim()).filter(Boolean) : undefined);
+
+/** The issue filters `issues` and `next` share; only the flags that were given. */
+const filters = opt => Object.fromEntries(['status', 'severity', 'feature', 'category']
+  .filter(k => typeof opt[k] === 'string').map(k => [k, opt[k]]));
 
 /** "--levels sign-in=L2,search=L3" (or "sign-in:L0->L2") → { feature: "Lcur->Lnew" } */
 export function parseLevels(spec, features) {
@@ -212,6 +227,36 @@ export async function main(argv, io = {}) {
         for (const line of formatLatestAssessment(latest)) println(line);
         for (const w of warnings) println(`warning: ${w}`);
         return 0;
+      }
+      case 'issues': {
+        const issues = listIssues(store.data().issues, filters(opt));
+        if (opt.json) { println(JSON.stringify(issues, null, 2)); return 0; }
+        if (!issues.length) { println('No issues match.'); return 0; }
+        const width = Math.max(...issues.map(i => i.id.length));
+        for (const i of issues) println(formatIssueLine(i, width));
+        return 0;
+      }
+      case 'next': {
+        const d = store.data();
+        const f = filters(opt);
+        const hit = nextIssue(d.issues, f);
+        const left = listIssues(d.issues, { ...f, status: 'open' }).length;
+        if (opt.json) { println(JSON.stringify(hit, null, 2)); return 0; }
+        if (!hit) { println('No open issues match.'); return 0; }
+        const { triage, ...fields } = hit;
+        show(fields, false);
+        println(`(${left} open${Object.keys(f).length ? ' matching' : ''}; when done: qa-tracker note ${hit.id} <what changed>, then set ${hit.id} status fixed)`);
+        return 0;
+      }
+      case 'note': {
+        const [id, ...words] = args;
+        const text = typeof opt.file === 'string' ? readText(path.resolve(io.cwd ?? process.cwd(), opt.file), 'utf8') : words.join(' ');
+        if (!id || !text.trim()) return fail('usage: note <issue> <text…> [--file <path>] [--date YYYY-MM-DD]');
+        const issue = store.data().issues.find(i => i.id === id);
+        if (!issue) return fail(`unknown issue: ${id}`);
+        const date = typeof opt.date === 'string' ? opt.date : new Date().toISOString().slice(0, 10);
+        const value = appendNote(issue.details, text, date);
+        return committed(store.commit({ kind: 'issue-details', issue: id, value }), () => `${id} note added (${date})`);
       }
       case 'surfaces': {
         const d = store.data();

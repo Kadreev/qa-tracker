@@ -522,3 +522,44 @@ test('status prints exactly STATUS.md, with issue warnings but not log warnings 
   assert.doesNotMatch(file, /asm-2099-01-01 does not exist/); // log warnings stay out
   assert.match(file, /\| QA-1 \| low \| accessibilityᴶ \| 2 \|/);
 });
+
+test('issues, next and note: an agent works the open issues top-down', async () => {
+  const cwd = project();
+  await run(cwd, 'init');
+  const ok = async (...a) => { const r = await run(cwd, ...a); assert.equal(r.code, 0, `${a.join(' ')}\n${r.err}`); return r; };
+  await ok('add-feature', 'a', '--name', 'A', '--area', 'X');
+  await ok('add-issue', '--feature', 'a', '--severity', 'low', '--complexity', '1', '--title', 'Typo');
+  await ok('add-issue', '--feature', 'a', '--severity', 'high', '--complexity', '5', '--title', 'Crash on save');
+  await ok('add-issue', '--feature', 'a', '--severity', 'high', '--complexity', '2', '--title', 'Wrong total');
+
+  const listed = (await ok('issues')).out.trim().split('\n').map(l => l.split(/\s+/)[0]);
+  assert.deepEqual(listed, ['QA-3', 'QA-2', 'QA-1']);
+  assert.deepEqual(JSON.parse((await ok('issues', '--severity', 'low', '--json')).out).map(i => i.id), ['QA-1']);
+
+  const next = (await ok('next')).out;
+  assert.match(next, /^id: QA-3$/m);
+  assert.match(next, /3 open; when done: qa-tracker note QA-3/);
+  assert.equal(JSON.parse((await ok('next', '--json')).out).id, 'QA-3');
+
+  // words need no quoting; the note lands as a dated paragraph
+  await ok('note', 'QA-3', 'Fixed', 'in', 'abc123;', 'total', 'now', 'sums', 'all', 'rows', '--date', '2026-01-05');
+  assert.match(read(cwd, 'issues.yaml'), /2026-01-05: Fixed in abc123; total now sums all rows/);
+  await ok('set', 'QA-3', 'status', 'fixed');
+  assert.match((await ok('next')).out, /^id: QA-2$/m);
+
+  const bad = await run(cwd, 'note', 'QA-9', 'x');
+  assert.equal(bad.code, 1);
+  assert.match(bad.err, /unknown issue: QA-9/);
+  assert.equal((await run(cwd, 'issues', '--status', 'done')).code, 1);
+});
+
+test('note --file reads the text from a file, folding its lines into one paragraph', async () => {
+  const cwd = project();
+  await run(cwd, 'init');
+  await run(cwd, 'add-feature', 'a', '--name', 'A', '--area', 'X');
+  await run(cwd, 'add-issue', '--feature', 'a', '--severity', 'low', '--title', 't', '--details', 'Seen once.');
+  writeFileSync(path.join(cwd, 'note.txt'), 'Root cause: a stale cache.\nFix: clear it on save.\n');
+  const r = await run(cwd, 'note', 'QA-1', '--file', 'note.txt', '--date', '2026-01-06');
+  assert.equal(r.code, 0, r.err);
+  assert.match(read(cwd, 'issues.yaml'), /Seen once\.\n\n\s*2026-01-06: Root cause: a stale cache\. Fix: clear it on save\./);
+});
