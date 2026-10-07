@@ -2,7 +2,7 @@
 // refuses anything a hostile web page could send through the user's browser.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
@@ -167,4 +167,24 @@ test('the page carries the data version and /api/version changes after any write
   await main(['add-issue', '--feature', 'a', '--title', 'Written by the CLI'], { ...quiet, cwd: dir });
   const after = JSON.parse((await request('GET', '/api/version')).body).version;
   assert.notEqual(after, before);
+});
+
+test('an edit answers with the data version before and after it, so the page adopts only its own write', async () => {
+  const origin = `http://localhost:${port}`;
+  const before = JSON.parse((await request('GET', '/api/version')).body).version;
+  await new Promise(r => setTimeout(r, 20));
+  const res = await edit({ kind: 'weight', feature: 'a', value: 2 }, { origin });
+  const body = JSON.parse(res.body);
+  assert.equal(res.status, 200);
+  assert.equal(body.previousVersion, before);
+  assert.notEqual(body.version, before);
+  assert.equal(body.version, JSON.parse((await request('GET', '/api/version')).body).version);
+});
+
+test('the data version ignores the config file, which serve reads only at start', async () => {
+  const cfgPath = path.join(dir, 'qa-tracker', 'qa-tracker.config.json');
+  const before = JSON.parse((await request('GET', '/api/version')).body).version;
+  await new Promise(r => setTimeout(r, 20));
+  writeFileSync(cfgPath, JSON.stringify({ title: 'Renamed', root: '..' }, null, 2) + '\n');
+  assert.equal(JSON.parse((await request('GET', '/api/version')).body).version, before);
 });

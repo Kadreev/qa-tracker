@@ -20,8 +20,12 @@ const hostname = host => String(host ?? '').replace(/:\d+$/, '').toLowerCase();
 
 /**
  * dataVersion(files) → a string that changes whenever a data file does (size and
- * mtime of the YAML files, the config and every surfaces file). The open page
- * polls it so a dashboard someone is watching follows CLI and agent writes.
+ * mtime of the YAML files and every surfaces file). The open page polls it so a
+ * dashboard someone is watching follows CLI and agent writes.
+ *
+ * The config file is left out on purpose: `serve` reads qa-tracker.config.json
+ * once at start, so a reload could not show a changed title or category list.
+ * Restart `serve` after editing the config.
  */
 export function dataVersion(files) {
   const stamp = f => {
@@ -30,7 +34,7 @@ export function dataVersion(files) {
   const surfaceFiles = existsSync(files.surfacesDir)
     ? readdirSync(files.surfacesDir).sort().map(n => path.join(files.surfacesDir, n))
     : [];
-  return [files.config, files.features, files.issues, files.runs, files.assessments, ...surfaceFiles].map(stamp).join('|');
+  return [files.features, files.issues, files.runs, files.assessments, ...surfaceFiles].map(stamp).join('|');
 }
 
 /** The full HTML page: toolbar, content and the edit script. */
@@ -71,16 +75,25 @@ export function page(data, { title, categories, version = '' }) {
   });
   // The data version this page was rendered from (see dataVersion on the server).
   var version = app.getAttribute('data-version');
-  // A save from this page is not an outside change: take the new version as ours.
-  function syncVersion() {
-    fetch('/api/version').then(function (r) { return r.json(); }).then(function (j) { if (j && j.version) version = j.version; }).catch(function () {});
+  // A save from this page is not an outside change. The edit response carries
+  // the data version just before and just after the server applied it: if the
+  // "before" one is not ours, something else wrote in between, so the page is
+  // stale and must not adopt the new version as its own.
+  function syncVersion(j) {
+    if (!j || !j.version) return;
+    if (j.previousVersion && j.previousVersion !== version) {
+      if (busy()) flash('Data changed on disk; reload to see it');
+      else location.reload();
+      return;
+    }
+    version = j.version;
   }
   function save(change, onOk, onDone) {
     flash('Saving…');
     fetch('/api/edit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(change) })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (res) {
-        if (res.ok && res.j.ok) { flash('Saved ✓'); syncVersion(); if (onOk) onOk(); }
+        if (res.ok && res.j.ok) { flash('Saved ✓'); syncVersion(res.j); if (onOk) onOk(); }
         else { flash((res.j && res.j.error) || 'Rejected', true); setTimeout(function () { location.reload(); }, 1500); }
       })
       .catch(function () { flash('Network error', true); })
@@ -88,10 +101,10 @@ export function page(data, { title, categories, version = '' }) {
   }
   // Follow writes made outside this page (the CLI, an agent): poll the data
   // version and reload when it changes, unless someone is editing here.
-  var busy = function () {
+  function busy() {
     var el = document.activeElement;
     return app.classList.contains('editing') || (el && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName));
-  };
+  }
   setInterval(function () {
     if (document.hidden || !version) return;
     fetch('/api/version').then(function (r) { return r.json(); }).then(function (j) {
@@ -197,8 +210,10 @@ export function createServer(store, { allowAnyHost = false } = {}) {
           return json(res, 400, { ok: false, error: 'body must be a JSON object' });
         if (!BROWSER_KINDS.includes(change.kind))
           return json(res, 400, { ok: false, error: `change kind not allowed from the dashboard: ${change.kind}` });
+        const previousVersion = dataVersion(store.config.files);
         const result = store.commit(change);
-        return json(res, result.ok ? 200 : 400, result);
+        if (!result.ok) return json(res, 400, result);
+        return json(res, 200, { ...result, previousVersion, version: dataVersion(store.config.files) });
       }
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('not found');

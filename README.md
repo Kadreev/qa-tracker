@@ -318,7 +318,8 @@ formatting. **Export PDF** uses the browser's print dialog.
 **Live.** The open page checks every few seconds whether the data files changed
 (`GET /api/version`) and reloads when the CLI or an agent wrote to them, so you
 can leave it open and watch work land. While you are in Edit mode or a field has
-focus it only says the data changed, and reloads nothing.
+focus it only says the data changed, and reloads nothing. `serve` reads
+`qa-tracker.config.json` once at start: restart it after changing the config.
 
 **Summary.** Above the coverage matrix sit four cards and three panels, all
 computed from the same data as the `## Summary` block at the top of `STATUS.md`:
