@@ -16,6 +16,13 @@ YAML; the CLI validates every write.
 2. Read its `STATUS.md`, then `AGENTS.md` (the full rules) if present.
 3. `npx qa-tracker plan --json` tells you what to validate next.
 
+## Fixing findings
+
+Take issues with `npx qa-tracker next` (the top of the dashboard's open-issues
+table: severity, then complexity), never by your own ordering unless asked.
+After the fix: `note <id> <what changed>`, then `set <id> status fixed`. Only a
+later run with `add-run --verified` makes it `verified-fixed`.
+
 ## Iron rules
 
 1. **No run, no level bump.** Levels move only through `add-run --levels`.

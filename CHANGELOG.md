@@ -7,6 +7,16 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `qa-tracker issues` lists issues in the dashboard's order (open: severity,
+  then complexity) with `--status`, `--severity`, `--feature` and `--category`
+  filters; `qa-tracker next` returns the open issue to work on now. An agent
+  fixing findings takes them in the order the person watching the dashboard sees.
+- `qa-tracker note <issue> <text…>` appends a dated paragraph to an issue's
+  details. The words need no quoting and `--file` reads the text from a file,
+  so notes survive shells that mangle multi-line arguments.
+- The dashboard follows writes made elsewhere: the page polls
+  `GET /api/version` and reloads when the data files change, unless you are
+  editing.
 - Issue categories: a default list of 11, replaceable in `qa-tracker.config.json`.
 - New optional issue fields: `details`, `category`, `complexity` (1-10, effort to
   fix) and `triage` (where each triage value came from), plus an append-only

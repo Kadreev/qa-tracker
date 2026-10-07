@@ -156,3 +156,15 @@ test('no route triggers an assessment', async () => {
     if (hadKey) process.env.TYPESAFE_API_KEY = priorKey; else delete process.env.TYPESAFE_API_KEY;
   }
 });
+
+test('the page carries the data version and /api/version changes after any write', async () => {
+  const page = await request('GET', '/');
+  const rendered = /data-version="([^"]*)"/.exec(page.body)[1];
+  const before = JSON.parse((await request('GET', '/api/version')).body).version;
+  assert.ok(before);
+  assert.equal(rendered.replace(/&amp;/g, '&'), before);
+  await new Promise(r => setTimeout(r, 20)); // a distinct mtime on coarse filesystems
+  await main(['add-issue', '--feature', 'a', '--title', 'Written by the CLI'], { ...quiet, cwd: dir });
+  const after = JSON.parse((await request('GET', '/api/version')).body).version;
+  assert.notEqual(after, before);
+});
