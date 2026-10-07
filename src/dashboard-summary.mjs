@@ -9,7 +9,15 @@ export const SUMMARY_STYLE = `
   .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
   .summary { display: grid; gap: 12px; margin: 16px 0 8px; }
   .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 12px; }
-  .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 12px; }
+  .panels { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  @media (min-width: 720px) {
+    .panels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .panels > .panel-features { grid-column: 1 / -1; }
+  }
+  @media (min-width: 1100px) {
+    .panels { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr); }
+    .panels > .panel-features { grid-column: auto; }
+  }
   .card, .panel { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
   .card-crit { border-color: var(--bad); box-shadow: inset 3px 0 0 var(--bad); }
   .card-label, .panel-title { margin: 0; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
@@ -26,11 +34,19 @@ export const SUMMARY_STYLE = `
   .key { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 2px 12px; color: var(--muted); font-size: 12px; }
   .key .sw { display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; vertical-align: 0; }
   .key .crit { color: var(--bad); font-weight: 600; }
-  .feat-rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .feat-rows { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .feat-more { display: grid; gap: 10px; }
+  .feat-more > summary { cursor: pointer; color: var(--muted); font-size: 12px; width: max-content; max-width: 100%; }
+  .feat-more > summary:hover { color: var(--fg); }
+  .feat-more > summary:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 2px; }
+  .feat-more[open] > summary { order: 1; }
+  .feat-more .more-open, .feat-more[open] .more-closed { display: none; }
+  .feat-more[open] .more-open { display: inline; }
   .feat-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; font-size: 13px; }
   .feat-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .feat-count { color: var(--muted); font-size: 12px; white-space: nowrap; }
-  .sev-status { font-size: 13px; }
+  .table-scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
+  .sev-status { font-size: 13px; width: 100%; }
   .sev-status th, .sev-status td { padding: 4px 6px; }
   .sev-status thead th { color: var(--muted); font-size: 12px; font-weight: 600; }
   .sev-status td { text-align: right; font-variant-numeric: tabular-nums; }
@@ -43,6 +59,7 @@ export const SUMMARY_STYLE = `
   @media print {
     .summary { margin-top: 8px; }
     .card, .panel { break-inside: avoid; box-shadow: none; }
+    .feat-more > summary { display: none; }
     .card-crit { border-color: #b00; border-left-width: 3px; }
   }`;
 
@@ -109,17 +126,27 @@ function hotspotCard({ issues, hotspot, byFeature }) {
     <div class="card-sub" title="${WEIGHTS}">Score ${hotspot.score} · ${counts}</div>`);
 }
 
-const panel = (title, body) => `<div class="panel"><h3 class="panel-title">${title}</h3>${body}</div>`;
+const panel = (title, body, cls = '') => `<div class="panel${cls ? ` ${cls}` : ''}"><h3 class="panel-title">${title}</h3>${body}</div>`;
+
+/** How many feature rows stay visible; the rest fold behind "Show all". */
+export const FEATURE_ROWS_VISIBLE = 8;
 
 function featurePanel({ issues, byFeature }) {
-  if (!issues.total) return panel('Issues by feature', empty('No issues yet'));
-  if (!byFeature.length) return panel('Issues by feature', empty('No open issues'));
+  if (!issues.total) return panel('Issues by feature', empty('No issues yet'), 'panel-features');
+  if (!byFeature.length) return panel('Issues by feature', empty('No open issues'), 'panel-features');
   const scale = Math.max(...byFeature.map(f => SEVERITY_KEYS.reduce((n, k) => n + f.open[k], 0)));
-  const rows = byFeature.map(f => {
+  const row = f => {
     const counts = SEVERITY_KEYS.filter(k => f.open[k]).map(k => `${f.open[k]} ${k}`).join(' · ');
     return `<li><div class="feat-head"><span class="feat-name" title="${esc(f.name)}">${esc(f.name)}</span><span class="feat-count">${counts}</span></div>${severityBar(f.open, scale)}</li>`;
-  }).join('');
-  return panel('Issues by feature', `<ul class="feat-rows">${rows}</ul>`);
+  };
+  // The worst features stay in view; a long tail would otherwise stretch every panel in
+  // the row to its height. <details> keeps the rest one click away with no script.
+  const top = byFeature.slice(0, FEATURE_ROWS_VISIBLE).map(row).join('');
+  const rest = byFeature.slice(FEATURE_ROWS_VISIBLE);
+  const more = rest.length
+    ? `<details class="feat-more"><summary><span class="more-closed">Show all ${byFeature.length} features</span><span class="more-open">Show fewer</span></summary><ul class="feat-rows">${rest.map(row).join('')}</ul></details>`
+    : '';
+  return panel('Issues by feature', `<ul class="feat-rows">${top}</ul>${more}`, 'panel-features');
 }
 
 function severityPanel({ issues }) {
@@ -129,9 +156,9 @@ function severityPanel({ issues }) {
     const c = issues.bySeverityStatus[k];
     return `<tr><th scope="row" class="sev ${sevClass(k)}">${k}</th>${[c.open, c.fixed, c.verified, c.wontFix].map(cellOf).join('')}</tr>`;
   }).join('');
-  return panel('Severity × status', `<table class="sev-status">
+  return panel('Severity × status', `<div class="table-scroll"><table class="sev-status">
     <thead><tr><th scope="col">Severity</th><th scope="col">Open</th><th scope="col">Fixed</th><th scope="col">Verified</th><th scope="col">Won't fix</th></tr></thead>
-    <tbody>${rows}</tbody></table>`);
+    <tbody>${rows}</tbody></table></div>`);
 }
 
 function queuePanel({ coverage, plan, triage, quickWins }) {
