@@ -84,6 +84,14 @@ All notable changes to this project are documented here. The format follows
   one of `critical`, `high`, `medium` or `low`.
 - `validate` prints warnings (`warning: …`, exit 0) alongside its errors.
 
+### Fixed
+- Dashboard summary panels are responsive: one column on a phone, issues by
+  feature full width over severity and the work queue on a tablet, and a wider
+  feature column on a desktop. Long feature names truncate instead of pushing
+  the list under the next panel, the severity table scrolls inside its panel,
+  and issues by feature shows the top 8 with the rest behind "Show all", so a
+  long feature list no longer stretches every panel in the row.
+
 ## [0.2.0] - 2026-10-04
 
 Tightens the evidence rules. Trackers whose YAML was hand-edited against them

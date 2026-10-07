@@ -239,6 +239,31 @@ test('dashboard summary cards and panels sit above the coverage matrix', () => {
   assert.ok(empty.includes('No features yet'));
 });
 
+test('issues by feature shows the top rows and folds the rest behind Show all', () => {
+  const many = structuredClone(data);
+  many.features = Array.from({ length: 11 }, (_, i) => ({
+    id: `f${i}`, name: `Feature ${i}`, area: 'A', weight: 3, target_level: 'L3', current_level: 'L0',
+    dimensions: { functionality: 'unknown', usability: 'unknown', code_health: 'unknown' }, issues: [`QA-${i}`], reverify: false,
+  }));
+  many.issues = many.features.map((f, i) => ({ id: `QA-${i}`, title: `Issue ${i}`, severity: 'low', type: 'functionality', feature: f.id, status: 'open' }));
+  const html = renderContent(many, { categories: dashCats });
+  const panel = html.slice(html.indexOf('Issues by feature'), html.indexOf('Severity × status'));
+  const [top, rest] = panel.split('<details');
+  assert.equal((top.match(/<li>/g) ?? []).length, 8, 'top eight rows always visible');
+  assert.ok(rest, 'the remaining rows are folded into a details element');
+  assert.ok(rest.includes('Show all 11 features'));
+  assert.ok(rest.includes('Show fewer'), 'the open state relabels the toggle');
+  assert.equal((rest.match(/<li>/g) ?? []).length, 3);
+  // eight or fewer: no disclosure at all
+  assert.ok(!renderContent(data, { categories: dashCats }).includes('feat-more'));
+});
+
+test('summary panels cannot overflow: rows and table shrink inside their panel', () => {
+  assert.ok(STYLE.includes('.feat-rows { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr);'));
+  assert.ok(STYLE.includes('.table-scroll { overflow-x: auto;'));
+  assert.ok(/@media \(min-width: 1100px\)[^}]*\.panels \{[^}]*grid-template-columns: minmax\(0, 1\.6fr\)/.test(STYLE));
+});
+
 test('a hostile feature name or issue title renders escaped in the summary', () => {
   const d = structuredClone(data);
   d.features[0].name = '<script>alert(1)</script>';
