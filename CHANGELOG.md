@@ -7,6 +7,8 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Nested interface verification grid with subtree percentages and open finding severity.
+- Local source-data activity freshness with stale and unavailable states; page refresh does not mark work as updated.
 - Issue categories: a default list of 11, replaceable in `qa-tracker.config.json`.
 - New optional issue fields: `details`, `category`, `complexity` (1-10, effort to
   fix) and `triage` (where each triage value came from), plus an append-only

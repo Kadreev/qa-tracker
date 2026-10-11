@@ -156,3 +156,15 @@ test('no route triggers an assessment', async () => {
     if (hadKey) process.env.TYPESAFE_API_KEY = priorKey; else delete process.env.TYPESAFE_API_KEY;
   }
 });
+
+test('activity reports source freshness without mutating data', async () => {
+  const first = await request('GET', '/api/activity');
+  assert.equal(first.status, 200);
+  const a = JSON.parse(first.body);
+  assert.match(a.html, /Data freshness/);
+  assert.ok(a.overall.lastUpdatedAt);
+  const second = await request('GET', '/api/activity');
+  const b = JSON.parse(second.body);
+  // An observation must not advance the last source update.
+  assert.equal(a.overall.lastUpdatedAt, b.overall.lastUpdatedAt);
+});

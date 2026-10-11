@@ -1,3 +1,4 @@
+import { renderInterfaceGrid } from './interface-grid.mjs';
 // HTML rendering for the local dashboard (src/server.mjs): the stylesheet and the
 // data content (summary cards, matrix, issues, triage queue, surfaces roll-up, next-run plan).
 // No script here; the server adds the toolbar and the edit wiring. Column explanations are
@@ -17,6 +18,19 @@ const idx = l => LEVELS.indexOf(l);
 export { esc };
 
 export const STYLE = `
+  .interface-grid__area { border:1px solid var(--line); border-radius:6px; margin:12px 0; padding:12px; overflow-x:auto; }
+  .interface-grid summary { cursor:pointer; }
+  .interface-grid summary:focus-visible, .activity summary:focus-visible { outline:2px solid var(--tgt); outline-offset:3px; }
+  .interface-grid__name, .interface-grid__route, .interface-grid__source, .interface-grid__pass, .interface-grid__states, .interface-grid__issues { display:block; }
+  .interface-grid__area-name, .interface-grid__pass { font-weight:600; }
+  .interface-grid__route, .interface-grid__source, .interface-grid__states, .interface-grid__note { color:var(--muted); font-size:12px; }
+  .interface-grid__table { min-width:540px; margin-top:8px; }
+  .interface-grid__table code { overflow-wrap:anywhere; font-size:11px; font-weight:400; }
+  .activity { border-bottom:1px solid var(--line); padding-bottom:12px; }
+  .activity-source { margin:6px 0; display:flex; flex-wrap:wrap; gap:8px; }
+  .activity-status { font-weight:600; }
+  .activity-stale, .activity-unknown, .activity-never { color:var(--warn); }
+  .activity-fresh { color:var(--ok); }
   :root { color-scheme: light dark; --bg:#fff; --fg:#111; --muted:#667; --line:#e3e5ea; --pass:#16a34a; --todo:#c3c9d4; --tgt:#2563eb; --ok:#16a34a; --bad:#dc2626; --warn:#d97706; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#0f1115; --fg:#e6e8ee; --muted:#9aa2b1; --line:#2a2e37; --todo:#3a4150; } }
   :root[data-theme="dark"] { --bg:#0f1115; --fg:#e6e8ee; --muted:#9aa2b1; --line:#2a2e37; --todo:#3a4150; }
@@ -170,7 +184,7 @@ export function renderContent(data, { title = DEFAULT_TITLE, categories = resolv
     <td class="sev ${esc(i.severity ?? 'none')}"${jevTitle(i, 'severity', data.assessments)}><span class="iv">${shown(i, 'severity')}</span>${triageSelect('iseverity', 'Severity', i, SEVERITIES, i.severity)}</td>
     <td${jevTitle(i, 'category', data.assessments)}><span class="iv">${shown(i, 'category')}</span>${triageSelect('icategory', 'Category', i, names, i.category)}</td>
     <td${jevTitle(i, 'complexity', data.assessments)}><span class="iv">${shown(i, 'complexity')}</span>${triageSelect('icomplexity', 'Complexity', i, COMPLEXITIES, i.complexity)}</td>
-    <td>${esc(i.feature)}</td><td class="title">${esc(i.title)}</td>
+    <td>${esc(i.feature)}</td><td class="title">${esc(i.title)}<details><summary>Details and evidence</summary><p>${esc(i.details ?? "No additional details recorded.")}</p><p>${esc(i.source ?? "")}</p></details></td>
     <td><span class="iv">${esc(i.status)}</span><select class="edit-only" data-act="istatus" aria-label="Status of ${esc(i.id)}">
       ${ISSUE_STATUS.map(s => `<option ${s === i.status ? 'selected' : (s === 'verified-fixed' ? 'disabled title="Recorded by a run: add-run --verified"' : '')}>${s}</option>`).join('')}
     </select></td></tr>`).join('\n');
@@ -222,7 +236,7 @@ export function renderContent(data, { title = DEFAULT_TITLE, categories = resolv
   </table></div>
   ${ISSUE_LEGEND}
   <h2>Triage queue</h2>
-  ${queueBlock}${surfacesBlock}
-  <h2>Next run plan</h2>
+  ${queueBlock}${surfacesBlock}${renderInterfaceGrid(data)}
+  <h2>Recorded runs</h2><p class="meta">${runs.length} run records. A run is not a unique test; counts and outcomes are in its report.</p><details><summary>Run history and evidence references</summary>${[...runs].reverse().map(r => `<article><h3>${esc(r.id)}</h3><p>${esc(r.date)} · ${esc(r.blast_radius)}</p><p>${esc((r.features_touched ?? []).join(", "))}</p><p>Report: ${esc(r.report ?? "Not recorded")}</p></article>`).join("")}</details><h2>Next run plan</h2>
   <ol>${planItems || '<li>All features at target.</li>'}</ol>`;
 }

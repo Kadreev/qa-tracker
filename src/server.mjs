@@ -1,3 +1,5 @@
+import { renderReports, readReport } from './reports.mjs';
+import { trackerActivity, renderActivity } from './activity.mjs';
 // Local dashboard server. Serves the tracker as a real page (so the browser's
 // print-to-PDF works) and writes edits straight back to the YAML files through
 // the store, which validates the whole dataset first.
@@ -17,7 +19,7 @@ const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
 const hostname = host => String(host ?? '').replace(/:\d+$/, '').toLowerCase();
 
 /** The full HTML page: toolbar, content and the edit script. */
-export function page(data, { title, categories }) {
+export function page(data, { title, categories, activity = null, reports = '' }) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(title)}</title>
@@ -31,10 +33,27 @@ export function page(data, { title, categories }) {
     <span id="save-status" role="status"></span>
     <span class="meta">Edits save straight to the YAML files.</span>
   </div>
-  ${renderContent(data, { title, categories })}
+  <section id="tracker-activity">${renderActivity(activity)}</section>
+  ${reports}${renderContent(data, { title, categories })}
 </main>
 <script>
 (function () {
+  var activityPending = false;
+  function refreshActivity() {
+    if (activityPending) return;
+    activityPending = true;
+    fetch('/api/activity').then(function (r) { if (!r.ok) throw new Error('Unavailable'); return r.json(); })
+      .then(function (a) {
+        var target = document.getElementById('tracker-activity');
+        if (target.contains(document.activeElement)) return;
+        var expanded = target.querySelector('details[open]');
+        target.innerHTML = a.html;
+        if (expanded && target.querySelector('details')) target.querySelector('details').open = true;
+      })
+      .catch(function () { document.getElementById('tracker-activity').textContent = 'Activity unavailable — cannot check updates.'; })
+      .finally(function () { activityPending = false; });
+  }
+  setInterval(refreshActivity, 30000);
   var app = document.getElementById('app');
   var status = document.getElementById('save-status');
   function flash(msg, bad) { status.textContent = msg; status.style.color = bad ? 'var(--bad)' : 'var(--ok)'; }
@@ -138,9 +157,21 @@ export function createServer(store, { allowAnyHost = false } = {}) {
       // Build each body before writing headers: a malformed YAML file throws
       // while reading, and the catch below must still be able to answer.
       if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html')) {
-        const html = page(store.data(), { title, categories });
+        const html = page(store.data(), { title, categories, activity: trackerActivity(store.config.files), reports: renderReports(store.config.dir) });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(html);
+      }
+      if (req.method === 'GET' && url.pathname === '/reports') {
+        const file = url.searchParams.get('file');
+        const content = readReport(store.config.dir, file);
+        if (content === null) return json(res, 404, { error: 'Report not found' });
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        return res.end(`<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(file)}</title><style>${STYLE} pre{white-space:pre-wrap;overflow-wrap:anywhere}</style><main><a href="/">Back to tracker</a><h1>${esc(file)}</h1><pre>${esc(content)}</pre>${renderReports(store.config.dir)}</main></html>`);
+      }
+      if (req.method === 'GET' && url.pathname === '/api/activity') {
+        res.setHeader('Cache-Control', 'no-store');
+        const activity = trackerActivity(store.config.files);
+        return json(res, 200, { overall: activity.overall, html: renderActivity(activity) });
       }
       if (req.method === 'GET' && url.pathname === '/api/data') return json(res, 200, store.data());
       if (req.method === 'POST' && url.pathname === '/api/edit') {

@@ -375,3 +375,20 @@ validating a large web app.
 ## License
 
 [MIT](LICENSE)
+
+### Interface verification and activity
+
+The dashboard includes an expandable interface grid from `surfaces/*.yaml`.
+Each row counts its own check and descendants once; verification is passed /
+inventoried checks, not product completion. Parent and child totals overlap and
+must not be added. Open finding severity is deduplicated within each subtree;
+feature-linked findings may appear under several interfaces sharing that feature.
+Existing data requires no migration.
+
+Activity shows local tracker source-file update times, with a stale indicator
+after 10 minutes without an update. It refreshes every 30 seconds; viewing or
+refreshing does not update source timestamps. This is file freshness, not an
+agent heartbeat or proof of QA execution. Copying/checking out files can change
+these timestamps. Missing information is shown as unavailable, not as fresh.
+
+Reports under the data directory's reports/ folder are browsable as escaped Markdown or JSON text. The dashboard exposes issue details and run history without inventing totals from overlapping reports. Local report access stays inside reports/; other repository files are not served.
